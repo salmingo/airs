@@ -23,7 +23,8 @@ void AstroDIP::RegisterReductResult(const ReductResultSlot &slot) {
 	rsltReduct_.connect(slot);
 }
 
-bool AstroDIP::ImageReduct(const string &fileapth) {
+bool AstroDIP::ImageReduct(FramePtr frame) {
+	frame_ = frame;
 	/* 检查文件有效性 */
 
 	/* 以多进程模式启动图像处理 */

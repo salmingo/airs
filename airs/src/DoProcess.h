@@ -60,12 +60,8 @@ protected:
 	int cnt_astro_;		//< 在执行: 天文定位进程数量
 	int cnt_photo_;		//< 在执行: 流量定标进程数量
 
-	boost::mutex mtx_imgfiles_;	// 互斥锁: 待处理图像文件队列
-	strque imgfiles_;	//< 待处理图像文件队列
-
-	boost::mutex mtx_frame_;
-	boost::mutex mtx_astro_;
-	boost::mutex mtx_photo_;
+	boost::mutex mtx_frame_;	//< 互斥锁: 图像处理队列
+	FrameQueue allframe_;	//< 图像处理队列
 
 	Parameter param_;	//< 参数
 

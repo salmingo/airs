@@ -9,12 +9,12 @@
 #define _AIRS_DATA_H_
 
 #include <string>
-#include <vector>
+#include <deque>
 #include <boost/smart_ptr.hpp>
 
 using std::string;
 
-enum {// 数据处理结果
+enum {// 数据处理过程和结果
 	FAIL_IMGREDUCT   = -1,	//< 图像处理失败
 	FAIL_ASTROMETRY  = -2,	//< 天文定位失败
 	FAIL_PHOTOMETRY  = -3,	//< 流量定标失败
@@ -23,7 +23,9 @@ enum {// 数据处理结果
 	SUCCESS_ASTROMETRY,		//< 完成天文定位
 	SUCCESS_PHOTOMETRY,		//< 完成流量定标
 	SUCCESS_INIT,			//< 初始化
-
+	PROCESS_IMGREDUCT,		//< 执行图像处理
+	PROCESS_ASTROMETRY,		//< 执行天文定位
+	PROCESS_PHOTOMETRY		//< 执行流量定标
 };
 
 /*!
@@ -71,6 +73,6 @@ public:
 	}
 };
 typedef boost::shared_ptr<OneFrame> FramePtr;	//< 单帧图像特征信息访问指针
-typedef std::vector<FramePtr> FrameVec;		//< 图像特征存储队列
+typedef std::deque<FramePtr> FrameQueue;		//< 图像特征存储队列
 
 #endif

@@ -13,7 +13,9 @@ DoProcess::DoProcess() {
 	asdaemon_   = false;
 	ios_        = NULL;
 	maxprocess_ = 0;
-	cntprocess_ = 0;
+	cnt_reduct_ = 0;
+	cnt_astro_  = 0;
+	cnt_photo_  = 0;
 }
 
 DoProcess::~DoProcess() {
@@ -45,8 +47,10 @@ void DoProcess::StopService() {
 }
 
 void DoProcess::ProcessImage(const string &filepath) {
-	mutex_lock lck(mtx_imgfiles_);
-	imgfiles_.push_back(filepath);
+	mutex_lock lck(mtx_frame_);
+	FramePtr frame = boost::make_shared<OneFrame>();
+	frame->filepath = filepath;
+	allframe_.push_back(frame);
 	PostMessage(MSG_NEW_IMAGE);
 }
 
@@ -108,19 +112,20 @@ void DoProcess::register_messages() {
 }
 
 void DoProcess::on_new_image(const long, const long) {
-	if (cntprocess_ < maxprocess_) {
-		string filepath;
-		if (imgfiles_.size()) {
-			mutex_lock lck(mtx_imgfiles_);
-			filepath = imgfiles_.front();
-			imgfiles_.pop_front();
+	if (cnt_reduct_ < maxprocess_) {
+		FramePtr frame;
+		if (allframe_.size()) {
+			mutex_lock lck(mtx_frame_);
+			FrameQueue::iterator it;
+			for (it = allframe_.begin(); it != allframe_.end() && (*it)->result != SUCCESS_INIT; ++it);
+			if (it != allframe_.end()) frame = allframe_.front();
 		}
 
-		if (filepath.size()) {
-			_gLog->Write("Prepare processing : %s", filepath.c_str());
+		if (frame.use_count()) {
+			_gLog->Write("Prepare processing : %s", frame->filepath.c_str());
 			int i;
 			for (i = 0; i < maxprocess_ && astrodip_[i]->IsWorking(); ++i);
-			if (astrodip_[i]->ImageReduct(filepath)) ++cntprocess_;
+			if (astrodip_[i]->ImageReduct(frame)) ++cnt_reduct_;
 			else PostMessage(MSG_COMPLETE_IMAGE, FAIL_IMGREDUCT);
 		}
 	}

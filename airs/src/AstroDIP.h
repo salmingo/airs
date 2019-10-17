@@ -26,6 +26,7 @@ protected:
 	/* 成员变量 */
 	ReductResult rsltReduct_;	//< 图像处理结果回调函数
 	bool working_;	//< 工作标志
+	FramePtr frame_;
 
 public:
 	/*!
@@ -43,7 +44,7 @@ public:
 	 * @return
 	 * 图像处理流程启动结果
 	 */
-	bool ImageReduct(const string &fileapth);
+	bool ImageReduct(FramePtr frame);
 };
 
 #endif /* ASTRODIP_H_ */
