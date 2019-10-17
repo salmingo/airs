@@ -7,11 +7,15 @@
 #include "PhotoMetry.h"
 
 PhotoMetry::PhotoMetry() {
-
+	working_ = false;
 }
 
 PhotoMetry::~PhotoMetry() {
 
+}
+
+bool PhotoMetry::IsWorking() {
+	return working_;
 }
 
 void PhotoMetry::RegisterPhotometryResult(const PhotometryResultSlot &slot) {

@@ -1,3 +1,0 @@
-AstroDIP.o: ../../airs/src/AstroDIP.cpp ../../airs/src/AstroDIP.h
-
-../../airs/src/AstroDIP.h:

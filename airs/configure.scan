@@ -3,7 +3,7 @@
 
 AC_PREREQ([2.69])
 AC_INIT([FULL-PACKAGE-NAME], [VERSION], [BUG-REPORT-ADDRESS])
-AC_CONFIG_SRCDIR([src/DoProcess.h])
+AC_CONFIG_SRCDIR([src/airsdata.h])
 AC_CONFIG_HEADERS([config.h])
 
 # Checks for programs.
@@ -19,8 +19,6 @@ AC_CHECK_LIB([boost_date_time], [main])
 AC_CHECK_LIB([boost_filesystem], [main])
 # FIXME: Replace `main' with a function in `-lboost_system':
 AC_CHECK_LIB([boost_system], [main])
-# FIXME: Replace `main' with a function in `-lboost_thread':
-AC_CHECK_LIB([boost_thread], [main])
 # FIXME: Replace `main' with a function in `-lcfitsio':
 AC_CHECK_LIB([cfitsio], [main])
 # FIXME: Replace `main' with a function in `-lcurl':

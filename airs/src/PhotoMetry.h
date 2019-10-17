@@ -23,8 +23,13 @@ public:
 protected:
 	/* 成员变量 */
 	PhotometryResult rsltPhotometry_;	//< 流量定标结果回调函数
+	bool working_;	//< 工作标志
 
 public:
+	/*!
+	 * @brief 检查工作标志
+	 */
+	bool IsWorking();
 	/*!
 	 * @brief 注册流量定标结果回调函数
 	 * @param slot 函数插槽

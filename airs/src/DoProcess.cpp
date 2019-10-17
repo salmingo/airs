@@ -12,7 +12,8 @@
 DoProcess::DoProcess() {
 	asdaemon_   = false;
 	ios_        = NULL;
-	processing_ = false;
+	maxprocess_ = 0;
+	cntprocess_ = 0;
 }
 
 DoProcess::~DoProcess() {
@@ -46,7 +47,7 @@ void DoProcess::StopService() {
 void DoProcess::ProcessImage(const string &filepath) {
 	mutex_lock lck(mtx_imgfiles_);
 	imgfiles_.push_back(filepath);
-	if (!processing_) PostMessage(MSG_NEW_IMAGE);
+	PostMessage(MSG_NEW_IMAGE);
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -55,26 +56,26 @@ void DoProcess::ImageReductResult(const long addr, bool &rslt) {
 	if (rslt && (param_.doAstrometry || param_.doPhotometry)) {
 		PostMessage(MSG_START_ASTROMETRY, addr);
 	}
-	else PostMessage(MSG_COMPLETE_IMAGE, rslt ? 0 : -1);
+	else PostMessage(MSG_COMPLETE_IMAGE, rslt ? SUCCESS_COMPLETE : FAIL_IMGREDUCT);
 }
 
 void DoProcess::AstrometryResult(const long addr, bool &rslt) {
 	if (rslt && param_.doPhotometry) {
 		PostMessage(MSG_START_PHOTOMETRY, addr);
 	}
-	else PostMessage(MSG_COMPLETE_IMAGE, rslt ? 0 : -2);
+	else PostMessage(MSG_COMPLETE_IMAGE, rslt ? SUCCESS_COMPLETE : FAIL_ASTROMETRY);
 }
 
 void DoProcess::PhotometryResult(const long addr, bool &rslt) {
-	PostMessage(MSG_COMPLETE_IMAGE, rslt ? 0 : -3);
+	PostMessage(MSG_COMPLETE_IMAGE, rslt ? SUCCESS_COMPLETE : FAIL_PHOTOMETRY);
 }
 
 //////////////////////////////////////////////////////////////////////////////
 void DoProcess::create_objects() {
-	int nthread = boost::thread::hardware_concurrency();
-	if (nthread > 4) nthread = 4; // 多进程最大数量
+	maxprocess_ = boost::thread::hardware_concurrency() / 2;
+	if (maxprocess_ > 4) maxprocess_ = 4; // 多进程最大数量
 
-	for (int i = 0; i < nthread; ++i) {
+	for (int i = 0; i < maxprocess_; ++i) {
 		AstroDIPtr    astrodip   = boost::make_shared<AstroDIP>();
 		AstroMetryPtr astrometry = boost::make_shared<AstroMetry>();
 		PhotoMetryPtr photometry = boost::make_shared<PhotoMetry>();
@@ -107,15 +108,21 @@ void DoProcess::register_messages() {
 }
 
 void DoProcess::on_new_image(const long, const long) {
-	string filepath;
-	{
-		mutex_lock lck(mtx_imgfiles_);
-		filepath = imgfiles_.front();
-	}
-	if (filepath.size()) {
-		_gLog->Write("Prepare processing : %s", filepath.c_str());
-		processing_ = astrodip_->ImageReduct(filepath);
-		if (!processing_) PostMessage(MSG_COMPLETE_IMAGE, -1);
+	if (cntprocess_ < maxprocess_) {
+		string filepath;
+		if (imgfiles_.size()) {
+			mutex_lock lck(mtx_imgfiles_);
+			filepath = imgfiles_.front();
+			imgfiles_.pop_front();
+		}
+
+		if (filepath.size()) {
+			_gLog->Write("Prepare processing : %s", filepath.c_str());
+			int i;
+			for (i = 0; i < maxprocess_ && astrodip_[i]->IsWorking(); ++i);
+			if (astrodip_[i]->ImageReduct(filepath)) ++cntprocess_;
+			else PostMessage(MSG_COMPLETE_IMAGE, FAIL_IMGREDUCT);
+		}
 	}
 }
 
@@ -135,10 +142,6 @@ void DoProcess::on_complete_image(const long rslt, const long) {
 			rslt == -1 ? "Image Reduction" : (rslt == -2 ? "doing Astrometry" : "doing Photometry"));
 	}
 	else _gLog->Write("Complete");
-	{
-		mutex_lock lck(mtx_imgfiles_);
-		imgfiles_.pop_front();
-	}
 	/* 依据工作环境和配置参数进一步处理 */
 	if (!rslt) {
 	}
@@ -147,11 +150,11 @@ void DoProcess::on_complete_image(const long rslt, const long) {
 	PostMessage(MSG_NEW_IMAGE);
 }
 
-void DoProcess::on_start_astrometry(const long rslt, const long) {
+void DoProcess::on_start_astrometry(const long addr, const long) {
 
 }
 
-void DoProcess::on_start_photometry(const long rslt, const long) {
+void DoProcess::on_start_photometry(const long addr, const long) {
 
 }
 

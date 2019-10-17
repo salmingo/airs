@@ -7,11 +7,15 @@
 #include "AstroMetry.h"
 
 AstroMetry::AstroMetry() {
-
+	working_ = false;
 }
 
 AstroMetry::~AstroMetry() {
 
+}
+
+bool AstroMetry::IsWorking() {
+	return working_;
 }
 
 void AstroMetry::RegisterAstrometryResult(const AstrometryResultSlot &slot) {
