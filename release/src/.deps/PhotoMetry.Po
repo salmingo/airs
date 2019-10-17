@@ -1,0 +1,3 @@
+PhotoMetry.o: ../../airs/src/PhotoMetry.cpp ../../airs/src/PhotoMetry.h
+
+../../airs/src/PhotoMetry.h:

@@ -1,0 +1,3 @@
+AstroMetry.o: ../../airs/src/AstroMetry.cpp ../../airs/src/AstroMetry.h
+
+../../airs/src/AstroMetry.h:
