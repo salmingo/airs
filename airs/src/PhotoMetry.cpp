@@ -22,3 +22,7 @@ void PhotoMetry::RegisterPhotometryResult(const PhotometryResultSlot &slot) {
 	if (!rsltPhotometry_.empty()) rsltPhotometry_.disconnect_all_slots();
 	rsltPhotometry_.connect(slot);
 }
+
+bool PhotoMetry::DoIt(FramePtr frame) {
+	return false;
+}

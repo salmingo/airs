@@ -27,8 +27,6 @@ AC_CHECK_LIB([curl], [main])
 AC_CHECK_LIB([m], [main])
 # FIXME: Replace `main' with a function in `-lpthread':
 AC_CHECK_LIB([pthread], [main])
-# FIXME: Replace `main' with a function in `-lrt':
-AC_CHECK_LIB([rt], [main])
 
 # Checks for header files.
 AC_CHECK_HEADERS([fcntl.h stdlib.h string.h syslog.h unistd.h])

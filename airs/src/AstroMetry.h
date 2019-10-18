@@ -35,6 +35,10 @@ public:
 	 * @param slot 函数插槽
 	 */
 	void RegisterAstrometryResult(const AstrometryResultSlot &slot);
+	/*!
+	 * @brief 尝试天文定位
+	 */
+	bool DoIt(FramePtr frame);
 };
 
 #endif /* ASTROMETRY_H_ */

@@ -12,10 +12,6 @@
 DoProcess::DoProcess() {
 	asdaemon_   = false;
 	ios_        = NULL;
-	maxprocess_ = 0;
-	cnt_reduct_ = 0;
-	cnt_astro_  = 0;
-	cnt_photo_  = 0;
 }
 
 DoProcess::~DoProcess() {
@@ -37,6 +33,7 @@ bool DoProcess::StartService(bool asdaemon, boost::asio::io_service *ios) {
 	if (param_.dbEnable && !param_.dbUrl.empty()) {
 		db_.reset(new WataDataTransfer(param_.dbUrl.c_str()));
 	}
+	env_prepare();
 	create_objects();
 
 	return true;
@@ -56,44 +53,67 @@ void DoProcess::ProcessImage(const string &filepath) {
 
 //////////////////////////////////////////////////////////////////////////////
 /* 处理结果回调函数 */
-void DoProcess::ImageReductResult(const long addr, bool &rslt) {
+void DoProcess::ImageReductResult(bool rslt, double fwhm) {
+	if (rslt) {// 通知服务器FWHM
+	}
 	if (rslt && (param_.doAstrometry || param_.doPhotometry)) {
-		PostMessage(MSG_START_ASTROMETRY, addr);
+		PostMessage(MSG_NEW_ASTROMETRY);
 	}
-	else PostMessage(MSG_COMPLETE_IMAGE, rslt ? SUCCESS_COMPLETE : FAIL_IMGREDUCT);
+	else PostMessage(MSG_COMPLETE_PROCESS);
 }
 
-void DoProcess::AstrometryResult(const long addr, bool &rslt) {
+void DoProcess::AstrometryResult(bool &rslt) {
 	if (rslt && param_.doPhotometry) {
-		PostMessage(MSG_START_PHOTOMETRY, addr);
+		PostMessage(MSG_NEW_PHOTOMETRY);
 	}
-	else PostMessage(MSG_COMPLETE_IMAGE, rslt ? SUCCESS_COMPLETE : FAIL_ASTROMETRY);
+	else PostMessage(MSG_COMPLETE_PROCESS);
 }
 
-void DoProcess::PhotometryResult(const long addr, bool &rslt) {
-	PostMessage(MSG_COMPLETE_IMAGE, rslt ? SUCCESS_COMPLETE : FAIL_PHOTOMETRY);
+void DoProcess::PhotometryResult(bool &rslt) {
+	PostMessage(MSG_COMPLETE_PROCESS);
 }
 
 //////////////////////////////////////////////////////////////////////////////
+void DoProcess::env_prepare() {
+	/* 复制SExtractor参数至数据处理目录 */
+
+	/* 将工作目录切换至数据处理目录 */
+}
+
 void DoProcess::create_objects() {
-	maxprocess_ = boost::thread::hardware_concurrency() / 2;
-	if (maxprocess_ > 4) maxprocess_ = 4; // 多进程最大数量
+	astrodip_   = boost::make_shared<AstroDIP>(&param_);
+	astrometry_ = boost::make_shared<AstroMetry>();
+	photometry_ = boost::make_shared<PhotoMetry>();
 
-	for (int i = 0; i < maxprocess_; ++i) {
-		AstroDIPtr    astrodip   = boost::make_shared<AstroDIP>();
-		AstroMetryPtr astrometry = boost::make_shared<AstroMetry>();
-		PhotoMetryPtr photometry = boost::make_shared<PhotoMetry>();
+	const AstroDIP::ReductResultSlot       &slot1 = boost::bind(&DoProcess::ImageReductResult, this, _1, _2);
+	const AstroMetry::AstrometryResultSlot &slot2 = boost::bind(&DoProcess::AstrometryResult,  this, _1);
+	const PhotoMetry::PhotometryResultSlot &slot3 = boost::bind(&DoProcess::PhotometryResult,  this, _1);
+	astrodip_->RegisterReductResult(slot1);
+	astrometry_->RegisterAstrometryResult(slot2);
+	photometry_->RegisterPhotometryResult(slot3);
+}
 
-		const AstroDIP::ReductResultSlot       &slot1 = boost::bind(&DoProcess::ImageReductResult, this, _1);
-		const AstroMetry::AstrometryResultSlot &slot2 = boost::bind(&DoProcess::AstrometryResult,  this, _1);
-		const PhotoMetry::PhotometryResultSlot &slot3 = boost::bind(&DoProcess::PhotometryResult,  this, _1);
-		astrodip->RegisterReductResult(slot1);
-		astrometry->RegisterAstrometryResult(slot2);
-		photometry->RegisterPhotometryResult(slot3);
+void DoProcess::thread_complete() {
+	boost::mutex mtx;
+	mutex_lock lck(mtx);
 
-		astrodip_.push_back(astrodip);
-		astrometry_.push_back(astrometry);
-		photometry_.push_back(photometry);
+	while(1) {
+		cv_complete_.wait(lck);
+		/* 检查已完成处理的文件 */
+		mutex_lock lck(mtx_frame_);
+		FramePtr frame;
+		for (FrameQueue::iterator it = allframe_.begin(); it != allframe_.end();) {
+			if ((*it)->result > 0) ++it;
+			else {
+				if ((*it)->result == SUCCESS_COMPLETE) {
+					frame = *it;
+					/* 尝试关联识别动目标 */
+
+					/* 尝试向数据库反馈关联结果 */
+				}
+				it = allframe_.erase(it);
+			}
+		}
 	}
 }
 
@@ -101,32 +121,69 @@ void DoProcess::create_objects() {
 /* 消息响应函数 */
 void DoProcess::register_messages() {
 	const CBSlot &slot1 = boost::bind(&DoProcess::on_new_image,        this, _1, _2);
-	const CBSlot &slot2 = boost::bind(&DoProcess::on_complete_image,   this, _1, _2);
-	const CBSlot &slot3 = boost::bind(&DoProcess::on_start_astrometry, this, _1, _2);
-	const CBSlot &slot4 = boost::bind(&DoProcess::on_start_photometry, this, _1, _2);
+	const CBSlot &slot2 = boost::bind(&DoProcess::on_new_astrometry,   this, _1, _2);
+	const CBSlot &slot3 = boost::bind(&DoProcess::on_new_photometry,   this, _1, _2);
+	const CBSlot &slot4 = boost::bind(&DoProcess::on_complete_process, this, _1, _2);
 
-	RegisterMessage(MSG_NEW_IMAGE,        slot1);
-	RegisterMessage(MSG_COMPLETE_IMAGE,   slot2);
-	RegisterMessage(MSG_START_ASTROMETRY, slot3);
-	RegisterMessage(MSG_START_PHOTOMETRY, slot4);
+	RegisterMessage(MSG_NEW_IMAGE,         slot1);
+	RegisterMessage(MSG_NEW_ASTROMETRY,    slot2);
+	RegisterMessage(MSG_NEW_PHOTOMETRY,    slot3);
+	RegisterMessage(MSG_COMPLETE_PROCESS,  slot4);
 }
 
 void DoProcess::on_new_image(const long, const long) {
-	if (cnt_reduct_ < maxprocess_) {
+	if (!astrodip_->IsWorking()) {
 		FramePtr frame;
 		if (allframe_.size()) {
 			mutex_lock lck(mtx_frame_);
 			FrameQueue::iterator it;
 			for (it = allframe_.begin(); it != allframe_.end() && (*it)->result != SUCCESS_INIT; ++it);
-			if (it != allframe_.end()) frame = allframe_.front();
+			if (it != allframe_.end()) frame = *it;
 		}
-
 		if (frame.use_count()) {
-			_gLog->Write("Prepare processing : %s", frame->filepath.c_str());
-			int i;
-			for (i = 0; i < maxprocess_ && astrodip_[i]->IsWorking(); ++i);
-			if (astrodip_[i]->ImageReduct(frame)) ++cnt_reduct_;
-			else PostMessage(MSG_COMPLETE_IMAGE, FAIL_IMGREDUCT);
+			_gLog->Write("Prepare processing %s", frame->filepath.c_str());
+			if (!astrodip_->DoIt(frame)) {
+				frame->result = FAIL_IMGREDUCT;
+				PostMessage(MSG_COMPLETE_PROCESS);
+			}
+		}
+	}
+}
+
+void DoProcess::on_new_astrometry(const long addr, const long) {
+	if (!astrometry_->IsWorking()) {
+		FramePtr frame;
+		if (allframe_.size()) {
+			mutex_lock lck(mtx_frame_);
+			FrameQueue::iterator it;
+			for (it = allframe_.begin(); it != allframe_.end() && (*it)->result != SUCCESS_IMGREDUCT; ++it);
+			if (it != allframe_.end()) frame = *it;
+		}
+		if (frame.use_count()) {
+			_gLog->Write("doing astrometry for %s", frame->filepath.c_str());
+			if (!astrometry_->DoIt(frame)) {
+				frame->result = FAIL_ASTROMETRY;
+				PostMessage(MSG_COMPLETE_PROCESS);
+			}
+		}
+	}
+}
+
+void DoProcess::on_new_photometry(const long addr, const long) {
+	if (!photometry_->IsWorking()) {
+		FramePtr frame;
+		if (allframe_.size()) {
+			mutex_lock lck(mtx_frame_);
+			FrameQueue::iterator it;
+			for (it = allframe_.begin(); it != allframe_.end() && (*it)->result != SUCCESS_ASTROMETRY; ++it);
+			if (it != allframe_.end()) frame = *it;
+		}
+		if (frame.use_count()) {
+			_gLog->Write("doing photometry for %s", frame->filepath.c_str());
+			if (!photometry_->DoIt(frame)) {
+				frame->result = FAIL_PHOTOMETRY;
+				PostMessage(MSG_COMPLETE_PROCESS);
+			}
 		}
 	}
 }
@@ -141,26 +198,10 @@ void DoProcess::on_new_image(const long, const long) {
  * -2: 天文流程失败
  * -3: 流量定标流程失败
  */
-void DoProcess::on_complete_image(const long rslt, const long) {
-	if (rslt) {
-		_gLog->Write(LOG_FAULT, NULL, "failed on %s",
-			rslt == -1 ? "Image Reduction" : (rslt == -2 ? "doing Astrometry" : "doing Photometry"));
-	}
-	else _gLog->Write("Complete");
-	/* 依据工作环境和配置参数进一步处理 */
-	if (!rslt) {
-	}
+void DoProcess::on_complete_process(const long rslt, const long) {
 
 	// 申请处理新的图像
 	PostMessage(MSG_NEW_IMAGE);
-}
-
-void DoProcess::on_start_astrometry(const long addr, const long) {
-
-}
-
-void DoProcess::on_start_photometry(const long addr, const long) {
-
 }
 
 //////////////////////////////////////////////////////////////////////////////

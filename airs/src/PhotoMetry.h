@@ -35,6 +35,10 @@ public:
 	 * @param slot 函数插槽
 	 */
 	void RegisterPhotometryResult(const PhotometryResultSlot &slot);
+	/*!
+	 * @brief 尝试流量定标
+	 */
+	bool DoIt(FramePtr frame);
 };
 
 #endif /* PHOTOMETRY_H_ */

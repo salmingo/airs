@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<version>0.1</version>
+<date>20191018T123403</date>
+<Output Path=""/>
+<Reduction PathExe="/usr/local/bin/sex" PathConfig="/usr/local/etc/sex-param"/>
+<Astrometry Enable="true" PathExe="/usr/local/bin/solve-field">
+    <PixelScale Low="8.3" High="8.5"/>
+</Astrometry>
+<Photometry Enable="true">
+    <Catalog Path=""/>
+</Photometry>
+<Database Enable="false">
+    <URL Addr="http://172.28.8.8:8080/gwebend/"/>
+</Database>

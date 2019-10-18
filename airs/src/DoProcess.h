@@ -18,7 +18,6 @@
 
 #include <deque>
 #include <vector>
-#include <boost/container/stable_vector.hpp>
 #include "MessageQueue.h"
 #include "Parameter.h"
 #include "AstroDIP.h"
@@ -39,15 +38,12 @@ protected:
 	typedef boost::shared_ptr<AstroDIP> AstroDIPtr;
 	typedef boost::shared_ptr<AstroMetry> AstroMetryPtr;
 	typedef boost::shared_ptr<PhotoMetry> PhotoMetryPtr;
-	typedef std::vector<AstroDIPtr> AstroDIPVec;
-	typedef std::vector<AstroMetryPtr> AstroMetryVec;
-	typedef std::vector<PhotoMetryPtr> PhotoMetryVec;
 
 	enum {// 声明消息字
 		MSG_NEW_IMAGE = MSG_USER,	//< 有新的图像数据等待处理
-		MSG_COMPLETE_IMAGE,			//< 完成图像处理/定位/定标流程
-		MSG_START_ASTROMETRY,		//< 启动天文定位流程
-		MSG_START_PHOTOMETRY,		//< 启动流程定标流程
+		MSG_NEW_ASTROMETRY,		//< 启动天文定位流程
+		MSG_NEW_PHOTOMETRY,		//< 启动流程定标流程
+		MSG_COMPLETE_PROCESS,	//< 完成图像处理/定位/定标流程
 		MSG_LAST
 	};
 
@@ -55,20 +51,16 @@ protected:
 	/* 成员变量 */
 	boost::asio::io_service *ios_;	//< io_service对象. 从内部结束程序
 	bool asdaemon_;		//< 以守护服务模式运行程序
-	int maxprocess_;	//< 最大进程数
-	int cnt_reduct_;	//< 在执行: 图像处理进程数量
-	int cnt_astro_;		//< 在执行: 天文定位进程数量
-	int cnt_photo_;		//< 在执行: 流量定标进程数量
+	Parameter param_;	//< 参数
 
 	boost::mutex mtx_frame_;	//< 互斥锁: 图像处理队列
 	FrameQueue allframe_;	//< 图像处理队列
+	AstroDIPtr   astrodip_;
+	AstroMetryPtr astrometry_;
+	PhotoMetryPtr photometry_;
 
-	Parameter param_;	//< 参数
-
-	AstroDIPVec   astrodip_;
-	AstroMetryVec astrometry_;
-	PhotoMetryVec photometry_;
-
+	threadptr thrd_complete_;	//< 线程: 完成数据处理
+	boost::condition_variable cv_complete_;	//< 条件变量: 完成数据处理
 	boost::shared_ptr<WataDataTransfer> db_; //< 数据库访问接口
 
 public:
@@ -91,28 +83,34 @@ public:
 	/* 回调函数 */
 	/*!
 	 * @brief 图像处理结果回调函数
-	 * @param addr AstroDIP对象指针
 	 * @param rslt 图像处理结果. true: 成功; false: 失败
+	 * @param fwhm 视场中心区域统计FWHM, 量纲: 像素
 	 */
-	void ImageReductResult(const long addr, bool &rslt);
+	void ImageReductResult(bool rslt, double fwhm);
 	/*!
 	 * @brief 天文定位结果回调函数
-	 * @param addr AstroMetry对象指针
 	 * @param rslt 天文定位结果. true: 成功; false: 失败
 	 */
-	void AstrometryResult(const long addr, bool &rslt);
+	void AstrometryResult(bool &rslt);
 	/*!
 	 * @brief 流量定标结果回调函数
-	 * @param addr PhotoMetry对象指针
 	 * @param rslt 流量定标结果. true: 成功; false: 失败
 	 */
-	void PhotometryResult(const long addr, bool &rslt);
+	void PhotometryResult(bool &rslt);
 
 protected:
+	/*!
+	 * @brief 准备工作环境
+	 */
+	void env_prepare();
 	/*!
 	 * @breif 创建AstroDIP/AstroMetry/PhotoMetry对象
 	 */
 	void create_objects();
+	/*!
+	 * @brief 线程: 已完成处理流程数据的后续处理
+	 */
+	void thread_complete();
 
 protected:
 	/* 消息队列 */
@@ -125,7 +123,15 @@ protected:
 	 */
 	void on_new_image(const long, const long);
 	/*!
-	 * @brief 响应消息MSG_COMPLETE_IMAGE
+	 * @brief 响应消息MSG_NEW_ASTROMETRY
+	 */
+	void on_new_astrometry(const long addr, const long);
+	/*!
+	 * @brief 响应消息MSG_NEW_PHOTOMETRY
+	 */
+	void on_new_photometry(const long addr, const long);
+	/*!
+	 * @brief 响应消息MSG_COMPLETE_PROCESS
 	 * @param rslt
 	 *  0: 完成完整处理流程
 	 *  1: 完成图像处理
@@ -136,15 +142,7 @@ protected:
 	 * -3: 流量定标流程失败
 	 * @param addr
 	 */
-	void on_complete_image(const long rslt, const long addr);
-	/*!
-	 * @brief 响应消息MSG_START_ASTROMETRY
-	 */
-	void on_start_astrometry(const long addr, const long);
-	/*!
-	 * @brief 响应消息MSG_START_PHOTOMETRY
-	 */
-	void on_start_photometry(const long addr, const long);
+	void on_complete_process(const long rslt, const long addr);
 };
 
 #endif /* DOPROCESS_H_ */

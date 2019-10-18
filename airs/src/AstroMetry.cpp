@@ -22,3 +22,7 @@ void AstroMetry::RegisterAstrometryResult(const AstrometryResultSlot &slot) {
 	if (!rsltAstrometry_.empty()) rsltAstrometry_.disconnect_all_slots();
 	rsltAstrometry_.connect(slot);
 }
+
+bool AstroMetry::DoIt(FramePtr frame) {
+	return false;
+}
