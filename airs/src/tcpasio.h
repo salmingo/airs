@@ -45,21 +45,21 @@ public:
 
 protected:
 	// 成员变量
-	boost::mutex mtxrcv_;	//< 接收互斥锁
-	boost::mutex mtxsnd_;	//< 发送互斥锁
+	boost::mutex mtxread_;	//< 接收互斥锁
+	boost::mutex mtxwrite_;	//< 发送互斥锁
 ///////////////////////////////////////////////////////////////////////////////
 	bool usebuf_;	//< 启用循环缓冲区
 	int bytercv_;	//< 已接收信息长度
 	charray bufrcv_;	//< 单条接收缓冲区
-	crcbuff crcrcv_;		//< 循环接收缓冲区
-	crcbuff crcsnd_;		//< 循环发送缓冲区
+	crcbuff crcread_;	//< 循环接收缓冲区
+	crcbuff crcwrite_;	//< 循环发送缓冲区
 	bool pause_rcv_;	//< 暂停接收
 
 	IOServiceKeep keep_;	//< 提供io_service对象
 	tcp::socket   sock_;	//< 套接字
 	CallbackFunc  cbconn_;	//< connect回调函数
-	CallbackFunc  cbrcv_;	//< receive回调函数
-	CallbackFunc  cbsnd_;	//< send回调函数
+	CallbackFunc  cbread_;	//< read回调函数
+	CallbackFunc  cbwrite_;	//< write回调函数
 
 public:
 	// 接口

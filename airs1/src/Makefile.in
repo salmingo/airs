@@ -89,7 +89,7 @@ POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
 target_triplet = @target@
-bin_PROGRAMS = airs$(EXEEXT)
+bin_PROGRAMS = airs1$(EXEEXT)
 subdir = src
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/configure.ac
@@ -101,15 +101,12 @@ CONFIG_CLEAN_FILES =
 CONFIG_CLEAN_VPATH_FILES =
 am__installdirs = "$(DESTDIR)$(bindir)"
 PROGRAMS = $(bin_PROGRAMS)
-am_airs_OBJECTS = daemon.$(OBJEXT) GLog.$(OBJEXT) AstroDIP.$(OBJEXT) \
-	AstroMetry.$(OBJEXT) PhotoMetry.$(OBJEXT) \
-	IOServiceKeep.$(OBJEXT) MessageQueue.$(OBJEXT) \
-	tcpasio.$(OBJEXT) WataDataTransfer.$(OBJEXT) \
-	AsciiProtocol.$(OBJEXT) DoProcess.$(OBJEXT) airs.$(OBJEXT)
-airs_OBJECTS = $(am_airs_OBJECTS)
+am_airs1_OBJECTS = Parameter.$(OBJEXT) GLog.$(OBJEXT) \
+	ADIReduct.$(OBJEXT) ADIProcess.$(OBJEXT) airs.$(OBJEXT)
+airs1_OBJECTS = $(am_airs1_OBJECTS)
 am__DEPENDENCIES_1 =
-airs_DEPENDENCIES = $(am__DEPENDENCIES_1)
-airs_LINK = $(CXXLD) $(AM_CXXFLAGS) $(CXXFLAGS) $(airs_LDFLAGS) \
+airs1_DEPENDENCIES = $(am__DEPENDENCIES_1)
+airs1_LINK = $(CXXLD) $(AM_CXXFLAGS) $(CXXFLAGS) $(airs1_LDFLAGS) \
 	$(LDFLAGS) -o $@
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
@@ -126,13 +123,9 @@ am__v_at_1 =
 DEFAULT_INCLUDES = -I.@am__isrc@
 depcomp = $(SHELL) $(top_srcdir)/depcomp
 am__maybe_remake_depfiles = depfiles
-am__depfiles_remade = ./$(DEPDIR)/AsciiProtocol.Po \
-	./$(DEPDIR)/AstroDIP.Po ./$(DEPDIR)/AstroMetry.Po \
-	./$(DEPDIR)/DoProcess.Po ./$(DEPDIR)/GLog.Po \
-	./$(DEPDIR)/IOServiceKeep.Po ./$(DEPDIR)/MessageQueue.Po \
-	./$(DEPDIR)/PhotoMetry.Po ./$(DEPDIR)/WataDataTransfer.Po \
-	./$(DEPDIR)/airs.Po ./$(DEPDIR)/daemon.Po \
-	./$(DEPDIR)/tcpasio.Po
+am__depfiles_remade = ./$(DEPDIR)/ADIProcess.Po \
+	./$(DEPDIR)/ADIReduct.Po ./$(DEPDIR)/GLog.Po \
+	./$(DEPDIR)/Parameter.Po ./$(DEPDIR)/airs.Po
 am__mv = mv -f
 CXXCOMPILE = $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) \
 	$(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS)
@@ -147,8 +140,8 @@ AM_V_CXXLD = $(am__v_CXXLD_@AM_V@)
 am__v_CXXLD_ = $(am__v_CXXLD_@AM_DEFAULT_V@)
 am__v_CXXLD_0 = @echo "  CXXLD   " $@;
 am__v_CXXLD_1 = 
-SOURCES = $(airs_SOURCES)
-DIST_SOURCES = $(airs_SOURCES)
+SOURCES = $(airs1_SOURCES)
+DIST_SOURCES = $(airs1_SOURCES)
 am__can_run_installinfo = \
   case $$AM_UPDATE_INFO_DIR in \
     n|no|NO) false;; \
@@ -278,13 +271,10 @@ target_vendor = @target_vendor@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-airs_SOURCES = daemon.cpp GLog.cpp AstroDIP.cpp AstroMetry.cpp PhotoMetry.cpp \
-             IOServiceKeep.cpp MessageQueue.cpp tcpasio.cpp WataDataTransfer.cpp \
-             AsciiProtocol.cpp DoProcess.cpp airs.cpp
-
-airs_LDFLAGS = -L/usr/local/lib
-BOOST_LIBS = -lboost_system -lboost_date_time -lboost_thread-mt -lboost_filesystem -lboost_chrono
-airs_LDADD = ${BOOST_LIBS} -lm -lpthread -lcurl -lcfitsio 
+airs1_SOURCES = Parameter.cpp GLog.cpp ADIReduct.cpp ADIProcess.cpp airs.cpp
+airs1_LDFLAGS = -L/usr/local/lib
+BOOST_LIBS = -lboost_system -lboost_date_time -lboost_thread-mt -lboost_filesystem -lboost_chrono -lboost_regex
+airs1_LDADD = ${BOOST_LIBS} -lm -lpthread -lcurl -lcfitsio 
 all: all-am
 
 .SUFFIXES:
@@ -361,9 +351,9 @@ uninstall-binPROGRAMS:
 clean-binPROGRAMS:
 	-test -z "$(bin_PROGRAMS)" || rm -f $(bin_PROGRAMS)
 
-airs$(EXEEXT): $(airs_OBJECTS) $(airs_DEPENDENCIES) $(EXTRA_airs_DEPENDENCIES) 
-	@rm -f airs$(EXEEXT)
-	$(AM_V_CXXLD)$(airs_LINK) $(airs_OBJECTS) $(airs_LDADD) $(LIBS)
+airs1$(EXEEXT): $(airs1_OBJECTS) $(airs1_DEPENDENCIES) $(EXTRA_airs1_DEPENDENCIES) 
+	@rm -f airs1$(EXEEXT)
+	$(AM_V_CXXLD)$(airs1_LINK) $(airs1_OBJECTS) $(airs1_LDADD) $(LIBS)
 
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
@@ -371,18 +361,11 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/AsciiProtocol.Po@am__quote@ # am--include-marker
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/AstroDIP.Po@am__quote@ # am--include-marker
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/AstroMetry.Po@am__quote@ # am--include-marker
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/DoProcess.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ADIProcess.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ADIReduct.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/GLog.Po@am__quote@ # am--include-marker
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/IOServiceKeep.Po@am__quote@ # am--include-marker
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/MessageQueue.Po@am__quote@ # am--include-marker
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/PhotoMetry.Po@am__quote@ # am--include-marker
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/WataDataTransfer.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/Parameter.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/airs.Po@am__quote@ # am--include-marker
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/daemon.Po@am__quote@ # am--include-marker
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/tcpasio.Po@am__quote@ # am--include-marker
 
 $(am__depfiles_remade):
 	@$(MKDIR_P) $(@D)
@@ -531,18 +514,11 @@ clean: clean-am
 clean-am: clean-binPROGRAMS clean-generic mostlyclean-am
 
 distclean: distclean-am
-		-rm -f ./$(DEPDIR)/AsciiProtocol.Po
-	-rm -f ./$(DEPDIR)/AstroDIP.Po
-	-rm -f ./$(DEPDIR)/AstroMetry.Po
-	-rm -f ./$(DEPDIR)/DoProcess.Po
+		-rm -f ./$(DEPDIR)/ADIProcess.Po
+	-rm -f ./$(DEPDIR)/ADIReduct.Po
 	-rm -f ./$(DEPDIR)/GLog.Po
-	-rm -f ./$(DEPDIR)/IOServiceKeep.Po
-	-rm -f ./$(DEPDIR)/MessageQueue.Po
-	-rm -f ./$(DEPDIR)/PhotoMetry.Po
-	-rm -f ./$(DEPDIR)/WataDataTransfer.Po
+	-rm -f ./$(DEPDIR)/Parameter.Po
 	-rm -f ./$(DEPDIR)/airs.Po
-	-rm -f ./$(DEPDIR)/daemon.Po
-	-rm -f ./$(DEPDIR)/tcpasio.Po
 	-rm -f Makefile
 distclean-am: clean-am distclean-compile distclean-generic \
 	distclean-tags
@@ -588,18 +564,11 @@ install-ps-am:
 installcheck-am:
 
 maintainer-clean: maintainer-clean-am
-		-rm -f ./$(DEPDIR)/AsciiProtocol.Po
-	-rm -f ./$(DEPDIR)/AstroDIP.Po
-	-rm -f ./$(DEPDIR)/AstroMetry.Po
-	-rm -f ./$(DEPDIR)/DoProcess.Po
+		-rm -f ./$(DEPDIR)/ADIProcess.Po
+	-rm -f ./$(DEPDIR)/ADIReduct.Po
 	-rm -f ./$(DEPDIR)/GLog.Po
-	-rm -f ./$(DEPDIR)/IOServiceKeep.Po
-	-rm -f ./$(DEPDIR)/MessageQueue.Po
-	-rm -f ./$(DEPDIR)/PhotoMetry.Po
-	-rm -f ./$(DEPDIR)/WataDataTransfer.Po
+	-rm -f ./$(DEPDIR)/Parameter.Po
 	-rm -f ./$(DEPDIR)/airs.Po
-	-rm -f ./$(DEPDIR)/daemon.Po
-	-rm -f ./$(DEPDIR)/tcpasio.Po
 	-rm -f Makefile
 maintainer-clean-am: distclean-am maintainer-clean-generic
 
@@ -635,8 +604,6 @@ uninstall-am: uninstall-binPROGRAMS
 
 .PRECIOUS: Makefile
 
-#BOOST_LIBS = -lboost_system -lboost_date_time -lboost_thread -lboost_filesystem -lboost_chrono
-#airs_LDADD = ${BOOST_LIBS} -lm -lpthread -lcurl -lcfitsio -lrt
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.

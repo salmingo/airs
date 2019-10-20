@@ -17,7 +17,7 @@ public:
 
 public:
 	/* 数据类型 */
-	typedef boost::signals2::signal<void (bool&)> PhotometryResult;	//< 流量定标结果回调函数
+	typedef boost::signals2::signal<void (bool, const long)> PhotometryResult;	//< 流量定标结果回调函数
 	typedef PhotometryResult::slot_type PhotometryResultSlot;		//< 流量定标结果回调函数插槽
 
 protected:

@@ -55,7 +55,9 @@ bool AstroDIP::DoIt(FramePtr frame) {
 		_gLog->Write(LOG_FAULT, "AstroDIP::DoIt()", "failed to fork multi-process");
 		return false;
 	}
-	execl(param_->pathExeSex.c_str(), "sex", frame_->filepath.c_str(), "-CATALOG_NAME", filemntr_.c_str(), NULL);
+	execl(param_->pathExeSex.c_str(), "sex", frame_->filepath.c_str(),
+			"-c", param_->pathCfgSex.c_str(),
+			"-CATALOG_NAME", filemntr_.c_str(), NULL);
 
 	return true;
 }
@@ -89,7 +91,8 @@ bool AstroDIP::check_image() {
 }
 
 void AstroDIP::create_monitor() {
-	path filepath = frame_->filepath;
+	path filepath = param_->pathWork;
+	filepath /= frame_->filename;
 	filepath.replace_extension("cat");
 	filemntr_ = filepath.string();
 }
@@ -172,7 +175,8 @@ void AstroDIP::thread_monitor() {
 		if (repeat < 3) tdt = (second_clock::universal_time() - start).total_milliseconds();
 	} while(repeat < 3 && tdt < 5000);
 	if ((exist = repeat == 3)) exist = load_catalog();
+	remove(filemntr);	// 删除监视点
 	working_ = false;
 	frame_->result = exist ? SUCCESS_IMGREDUCT : FAIL_IMGREDUCT;
-	rsltReduct_(exist, fwhm_);
+	rsltReduct_(exist, (const long) frame_.get(), fwhm_);
 }

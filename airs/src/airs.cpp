@@ -105,12 +105,12 @@ int main(int argc, char **argv) {
 			for (int i = 0; i < argc; ++i) doProcess->ProcessImage(argv[i]);
 		}
 		ios.run();
-		doProcess->StopService();
 		if (is_daemon) _gLog->Write("Daemon stop running");
 	}
 	else {
 		_gLog->Write(LOG_FAULT, NULL, "Fail to launch %s", DAEMON_NAME);
 	}
+	doProcess->StopService();
 
 	return 0;
 }

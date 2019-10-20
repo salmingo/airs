@@ -21,7 +21,7 @@ public:
 
 public:
 	/* 数据类型 */
-	typedef boost::signals2::signal<void (bool, double)> ReductResult;	//< 图像处理结果回调函数
+	typedef boost::signals2::signal<void (bool, const long, double)> ReductResult;	//< 图像处理结果回调函数
 	typedef ReductResult::slot_type ReductResultSlot;			//< 图像处理结果回调函数插槽
 	typedef boost::shared_ptr<boost::thread> threadptr;			//< 线程指针
 
