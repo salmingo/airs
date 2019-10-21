@@ -29,6 +29,17 @@ public:
 	string pathFLAT;	//< 文件路径: 合并后平场
 
 	/* 图像处理 */
+	int backWidth, backHeight;	//< 背景拟合网格大小
+	int backFilterWidth, backFilterHeight;	//< 背景滤波网格数量
+	double snrDetect;	//< 信噪比: 单像素提取
+	double snrAnalysis;	//< 信噪比: 目标识别
+	int areaMin, areaMax;	//< 构成目标的像素数阈值
+	bool useFilterDetect;		//< 启用: 在信号提取前滤波
+	string pathFilterDetect;	//< 信号提取滤波函数卷积核存储路径
+	bool useCleanSpurious;		//< 启用: 剔除假信号
+
+	bool useResultFile;			//< 启用: 输出处理结果到文件中
+	string subpathResult;		//< 结果文件目录名
 
 	/* 天文定位 */
 
@@ -78,6 +89,15 @@ protected:
 	 * @brief 退出时保存文件
 	 */
 	void save();
+	/*!
+	 * @brief 将字符串数值解析为两个整数
+	 * @param str 字符串
+	 * @param v1  数值1
+	 * @param v2  数值2
+	 * @note
+	 * 字符串若包含分隔符",", 则分别赋值; 否则赋予相同数值
+	 */
+	void split2int(const string & str, int &v1, int &v2);
 };
 
 #endif /* PARAMETER_H_ */

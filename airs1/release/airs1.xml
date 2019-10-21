@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<version>0.1</version>
+<date>2019-10-21T04:45:08</date>
+<Preprocess Enable="false">
+    <ZERO Path=""/>
+    <DARK Path=""/>
+    <FLAT Path=""/>
+</Preprocess>
+<ImageReduct>
+    <BackMesh Size="64"/>
+    <!--<size> or <width>, <height>-->
+    <BackFilter Size="3"/>
+    <!--<size> or <width>, <height>-->
+    <Detect SNR="1.5"/>
+    <Analysis SNR="10"/>
+    <Area Minimum="3" Maximum="0"/>
+    <!--Area.Maximum == 0 means unlimited-->
+    <Filter Enable="false" Filepath=""/>
+    <!--use filter to detect signal-->
+    <CleanSpurious Enable="true"/>
+    <Result Enable="false" Subpath=""/>
+</ImageReduct>

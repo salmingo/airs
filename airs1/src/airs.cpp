@@ -18,13 +18,20 @@
 #include <getopt.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <string.h>
+#include <regex>
+#include <vector>
 #include "globaldef.h"
 #include "Parameter.h"
 #include "GLog.h"
 #include "ADIProcess.h"
 
+using namespace AstroUtil;
+typedef std::vector<string> strvector;
+
 GLog _gLog(stdout);
 
+//////////////////////////////////////////////////////////////////////////////
 /*!
  * @brief 显示使用说明
  */
@@ -94,8 +101,12 @@ int main(int argc, char **argv) {
 		return -4;
 	}
 	/* 启动数据处理流程 */
+	ADIProcess adip(&param);
 	for (int i = 0; i < argc; ++i) {
+		adip.SetImage(argv[i]);
+		if (adip.DoIt()) {
 
+		}
 	}
 
 	return 0;

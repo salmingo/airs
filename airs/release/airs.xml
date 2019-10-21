@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <version>0.1</version>
-<date>20191019T113154</date>
-<Output Path="/Users/lxm/Data"/>
+<date>20191020T234044</date>
+<Output Path="/Users/lxm/Public"/>
 <Work Path="/Users/lxm/Public"/>
 <Reduction PathExe="/usr/local/bin/sex" PathConfig="/usr/local/etc/sex-param/default.sex"/>
 <Astrometry Enable="false" PathExe="/usr/local/bin/solve-field">
@@ -16,6 +16,6 @@
 <GeneralControl Enable="false">
     <Host IPv4="127.0.0.1" Port="4020"/>
 </GeneralControl>
-<FileServer Enable="false">
+<FileServer Enable="true">
     <Host IPv4="127.0.0.1" Port="4021"/>
 </FileServer>

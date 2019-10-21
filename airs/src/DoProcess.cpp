@@ -32,11 +32,12 @@ bool DoProcess::StartService(bool asdaemon, boost::asio::io_service *ios) {
 	std::string name = "msgque_";
 	name += DAEMON_NAME;
 	if (!Start(name.c_str())) return false;
-	/* 为成员变量分配资源 */
-	if (!connect_server_gc()) return false;
-	if (!connect_server_fileserver()) return false;
-	if (param_.dbEnable && !param_.dbUrl.empty()) {
-		db_.reset(new WataDataTransfer(param_.dbUrl.c_str()));
+	if (asdaemon) {/* 为成员变量分配资源 */
+		if (!connect_server_gc()) return false;
+		if (!connect_server_fileserver()) return false;
+		if (param_.dbEnable && !param_.dbUrl.empty()) {
+			db_.reset(new WataDataTransfer(param_.dbUrl.c_str()));
+		}
 	}
 	create_objects();
 	thrd_complete_.reset(new boost::thread(boost::bind(&DoProcess::thread_complete, this)));

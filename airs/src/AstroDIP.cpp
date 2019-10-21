@@ -55,6 +55,7 @@ bool AstroDIP::DoIt(FramePtr frame) {
 		_gLog->Write(LOG_FAULT, "AstroDIP::DoIt()", "failed to fork multi-process");
 		return false;
 	}
+	if (fork() > 0) exit(0);
 	execl(param_->pathExeSex.c_str(), "sex", frame_->filepath.c_str(),
 			"-c", param_->pathCfgSex.c_str(),
 			"-CATALOG_NAME", filemntr_.c_str(), NULL);
@@ -105,7 +106,7 @@ bool AstroDIP::load_catalog() {
 	int x2 = x1 + frame_->wimg / 4;
 	int y1 = (frame_->himg - frame_->himg / 4) / 2;
 	int y2 = y1 + frame_->himg / 4;
-	int pos;
+	int pos, area;
 	BodyVector &buff = frame_->bodies;
 	vector<double> fwhm;
 	FILE *fp = fopen(filemntr_.c_str(), "r");
@@ -123,9 +124,7 @@ bool AstroDIP::load_catalog() {
 	 */
 	while (!feof(fp)) {
 		if (NULL == fgets(line, 200, fp) || line[0] == '#') continue;
-		token = strtok(line, seps);
-		if (atoi(token) < 5) continue; // 面积小于5
-
+		token = strtok(line, seps); area = atoi(token);
 		pos = 0;
 		OneBody body;
 		while ((token = strtok(NULL, seps)) && pos <= 5) {
@@ -135,12 +134,18 @@ bool AstroDIP::load_catalog() {
 				if ((flux = atof(token)) < 1.0) break;
 				body.mag_img = 25.0 - 2.5 * log10(atof(token) / frame_->exptime);
 			}
-			else if (pos == 4) body.fwhm = atof(token);
+			else if (pos == 4) body.fwhm  = atof(token);
 			else if (pos == 5) body.ellip = atof(token);
 		}
 		if (pos == 5) {
 			buff.push_back(body);
-			if (body.x > x1 && body.x < x2 && body.y > y1 && body.y < y2)
+			/*
+			 * 参与统计FWHM条件:
+			 * - 面积大于10
+			 * - 圆形度小于0.1
+			 * - 在中心区域内
+			 */
+			if (area > 10 && body.ellip < 0.1 && body.x > x1 && body.x < x2 && body.y > y1 && body.y < y2)
 				fwhm.push_back(body.fwhm);
 		}
 	}
@@ -163,7 +168,7 @@ void AstroDIP::thread_monitor() {
 	path filemntr(filemntr_);
 	file_status status;
 	boost::system::error_code ec;
-	int sizeold(0), sizenew(0), repeat(0);
+	int sizeold(0), sizenew(0), repeat(0), maxrepeat(5);
 	bool exist;
 
 	do {
@@ -171,11 +176,12 @@ void AstroDIP::thread_monitor() {
 		sizeold = sizenew;
 		sizenew = file_size(filemntr, ec);
 		if (sizenew && sizeold == sizenew) ++repeat;
-		else if (--repeat < 0) repeat = 0;
-		if (repeat < 3) tdt = (second_clock::universal_time() - start).total_milliseconds();
-	} while(repeat < 3 && tdt < 5000);
-	if ((exist = repeat == 3)) exist = load_catalog();
-	remove(filemntr);	// 删除监视点
+		else if (repeat < 0) repeat = 0;
+		if (repeat < maxrepeat) tdt = (second_clock::universal_time() - start).total_milliseconds();
+	} while(repeat < maxrepeat/* && tdt < 20000*/);
+	_gLog->Write("filesize = %d", sizenew);
+	if ((exist = repeat == maxrepeat)) exist = load_catalog();
+//	remove(filemntr);	// 删除监视点
 	working_ = false;
 	frame_->result = exist ? SUCCESS_IMGREDUCT : FAIL_IMGREDUCT;
 	rsltReduct_(exist, (const long) frame_.get(), fwhm_);

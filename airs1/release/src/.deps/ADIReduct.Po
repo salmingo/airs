@@ -1,0 +1,3 @@
+ADIReduct.o: ../../src/ADIReduct.cpp ../../src/ADIReduct.h
+
+../../src/ADIReduct.h:
