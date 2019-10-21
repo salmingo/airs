@@ -8,7 +8,11 @@
 #define ADIDATA_H_
 
 #include <string>
+#include <vector>
+#include <memory>
+
 using std::string;
+using std::vector;
 
 /*!
  * @struct Point2f 由二维实数构成的坐标
@@ -35,16 +39,39 @@ struct StellarInfo {
 	float ellipticity;	//< 椭率
 	float snr;			//< 信噪比
 };
+typedef vector<StellarInfo> NFStellarVector;
 
 /*!
- * @struct FrameImage 一帧2D图像数据的相关信息
+ * @struct ImageFrame 一帧2D图像数据的相关信息
  */
-struct FrameImage {
+struct ImageFrame {
 	string filename;	//< 文件名
 	int wdim, hdim;		//< 图像宽度和高度
 	string dateobs;		//< 曝光起始时间, 格式: CCYY-MM-DDThh:mm:ss<.sss<sss>>
 	string datemid;		//< 曝光中间时间, 格式: CCYY-MM-DDThh:mm:ss<.sss<sss>>
 	float expdur;		//< 曝光时间, 量纲: 秒
+	NFStellarVector nfs;	//< 星状目标信息集合
+
+public:
+	~ImageFrame() {
+		nfs.clear();
+	}
+
+	/*!
+	 * @brief 计算图像的像素数
+	 */
+	int Pixels() {
+		return (wdim * hdim);
+	}
+
+	/*!
+	 * @brief 更新目标信息存储区空间大小
+	 */
+	bool UpdateNumberStellar(int n) {
+		if (nfs.size() < n) nfs.resize(n);
+		return (nfs.size() >= n);
+	}
 };
+typedef std::shared_ptr<ImageFrame> ImgFrmPtr;
 
 #endif

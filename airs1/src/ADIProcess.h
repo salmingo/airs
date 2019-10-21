@@ -7,6 +7,7 @@
 #ifndef ADIPROCESS_H_
 #define ADIPROCESS_H_
 
+#include "ADIData.h"
 #include "Parameter.h"
 
 namespace AstroUtil {
@@ -19,12 +20,13 @@ public:
 protected:
 	Parameter *param_;	//< 参数
 	int nmaxthread_;	//< 最大线程数
-	float *dataimg_;	//< 缓存区: 原始图像数据
-	float *databuf_;	//< 缓存区: 图像数据备份
-	float *databk_;		//< 缓存区: 背景
-	float *datarms_;	//< 缓存区: 噪声
-	float *bkmesh_;		//< 缓存区: 背景网格
-	float *bkrms_;		//< 缓存区: 网格噪声
+	vector<float> dataimg_;	//< 缓存区: 原始图像数据
+	vector<float> databuf_;	//< 缓存区: 图像数据备份
+	vector<float> databk_;	//< 缓存区: 背景
+	vector<float> datarms_;	//< 缓存区: 噪声
+	vector<float> bkmesh_;	//< 缓存区: 背景网格
+	vector<float> bkrms_;	//< 缓存区: 网格噪声
+	ImgFrmPtr frmptr_;		//< 存储区: 图像处理结果
 
 public:
 	/*!
@@ -40,11 +42,6 @@ public:
 	bool DoIt();
 
 protected:
-	/*!
-	 * @brief 释放已分配内存
-	 * @param ptr
-	 */
-	void freebuff(void **ptr);
 	/*!
 	 * @brief 尝试打开文件并载入数据
 	 * @return
