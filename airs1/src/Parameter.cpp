@@ -9,18 +9,20 @@
 #include <boost/foreach.hpp>
 #include "Parameter.h"
 
+using namespace std;
+using namespace boost;
 using namespace boost::property_tree;
+using namespace boost::posix_time;
 
 Parameter::Parameter() {
 	modified  = false;
-	doPreproc = false;
-	backWidth = backHeight = 0;
-	backFilterWidth = backFilterHeight = 0;
-	snrDetect = snrAnalysis = 0.0;
-	areaMin = areaMax = 0;
-	useFilterDetect   = false;
-	useCleanSpurious  = false;
-	useResultFile     = false;
+	dopre     = false;
+	bkw = bkh = 0;
+	bkfw = bkfh = 0;
+	snrp = snro = 0.0;
+	area0 = area1 = 0;
+	ufo   = false;
+	ucs   = false;
 }
 
 Parameter::~Parameter() {
@@ -34,10 +36,11 @@ const char *Parameter::ErrorMessage() {
 void Parameter::Init(const string &filepath) {
 	this->filepath = filepath;
 
-	using namespace boost::posix_time;
 	nodes.clear();
 	nodes.add("version", "0.1");
 	nodes.add("date", to_iso_extended_string(second_clock::universal_time()));
+
+	nodes.add("Output.<xmlattr>.Path", "");
 
 	ptree &pt1 = nodes.add("Preprocess", "");
 	pt1.add("<xmlattr>.Enable", false);
@@ -50,7 +53,7 @@ void Parameter::Init(const string &filepath) {
 	pt2.add("<xmlcomment>", "<size> or <width>, <height>");
 	pt2.add("BackFilter.<xmlattr>.Size",       "3");
 	pt2.add("<xmlcomment>", "<size> or <width>, <height>");
-	pt2.add("Detect.<xmlattr>.SNR",            1.5);
+	pt2.add("Detect.<xmlattr>.SNR",            3.0);
 	pt2.add("Analysis.<xmlattr>.SNR",          10.0);
 	pt2.add("Area.<xmlattr>.Minimum",          3);
 	pt2.add("Area.<xmlattr>.Maximum",          0);
@@ -59,8 +62,6 @@ void Parameter::Init(const string &filepath) {
 	pt2.add("Filter.<xmlattr>.Filepath",       "");
 	pt2.add("<xmlcomment>", "use filter to detect signal");
 	pt2.add("CleanSpurious.<xmlattr>.Enable",  true);
-	pt2.add("Result.<xmlattr>.Enable",         false);
-	pt2.add("Result.<xmlattr>.Subpath",        "");
 
 	modified = true;
 }
@@ -72,29 +73,30 @@ bool Parameter::Load(const string &filepath) {
 		string str;
 
 		nodes.clear();
-		read_xml(filepath, nodes, boost::property_tree::xml_parser::trim_whitespace);
+		read_xml(filepath, nodes, property_tree::xml_parser::trim_whitespace);
 
 		BOOST_FOREACH(ptree::value_type const &child, nodes.get_child("")) {
-			if (boost::iequals(child.first, "Preprocess")) {
-				doPreproc = child.second.get("<xmlattr>.Enable",    false);
-				pathZERO  = child.second.get("ZERO.<xmlattr>.Path", "");
-				pathDARK  = child.second.get("DARK.<xmlattr>.Path", "");
-				pathFLAT  = child.second.get("FLAT.<xmlattr>.Path", "");
+			if (iequals(child.first, "Preprocess")) {
+				dopre = child.second.get("<xmlattr>.Enable",    false);
+				pathz  = child.second.get("ZERO.<xmlattr>.Path", "");
+				pathd  = child.second.get("DARK.<xmlattr>.Path", "");
+				pathf  = child.second.get("FLAT.<xmlattr>.Path", "");
 			}
-			else if (boost::iequals(child.first, "ImageReduct")) {
-				str = child.second.get("BackMesh.<xmlattr>.Size",                      "64");
-				split2int(str, backWidth, backHeight);
-				str = child.second.get("BackFilter.<xmlattr>.Size",                    "3");
-				split2int(str, backFilterWidth, backFilterHeight);
-				snrDetect = child.second.get("Detect.<xmlattr>.SNR",                   1.5);
-				snrAnalysis = child.second.get("Analysis.<xmlattr>.SNR",               10.0);
-				areaMin = child.second.get("Area.<xmlattr>.Minimum",                   3);
-				areaMax = child.second.get("Area.<xmlattr>.Maximum",                   100);
-				useFilterDetect = child.second.get("Filter.<xmlattr>.Enable",          false);
-				pathFilterDetect = child.second.get("Filter.<xmlattr>.Filepath",       "");
-				useCleanSpurious = child.second.get("CleanSpurious.<xmlattr>.Enable",  false);
-				useResultFile = child.second.get("Result.<xmlattr>.Enable",            false);
-				subpathResult = child.second.get("Result.<xmlattr>.Subpat",            "");
+			else if (iequals(child.first, "ImageReduct")) {
+				str    = child.second.get("BackMesh.<xmlattr>.Size",          "64");
+				split2int(str, bkw, bkh);
+				str    = child.second.get("BackFilter.<xmlattr>.Size",         "3");
+				split2int(str, bkfw, bkfh);
+				snrp   = child.second.get("Detect.<xmlattr>.SNR",              3.0);
+				snro   = child.second.get("Analysis.<xmlattr>.SNR",           10.0);
+				area0  = child.second.get("Area.<xmlattr>.Minimum",              3);
+				area1  = child.second.get("Area.<xmlattr>.Maximum",              0);
+				ufo    = child.second.get("Filter.<xmlattr>.Enable",         false);
+				pathfo = child.second.get("Filter.<xmlattr>.Filepath",          "");
+				ucs    = child.second.get("CleanSpurious.<xmlattr>.Enable",  false);
+			}
+			else if (iequals(child.first, "Output")) {
+				patho = child.second.get("<xmlattr>.Path", "");
 			}
 		}
 
@@ -107,37 +109,37 @@ bool Parameter::Load(const string &filepath) {
 }
 
 void Parameter::UpdateZERO(const string &filepath) {
-	if (filepath != pathZERO) {
+	if (filepath != pathz) {
 		modified = true;
-		nodes.put("Preprocess.ZERO.<xmlattr>.Path", pathZERO = filepath);
+		nodes.put("Preprocess.ZERO.<xmlattr>.Path", pathz = filepath);
 	}
 }
 
 void Parameter::UpdateDARK(const string &filepath) {
-	if (filepath != pathDARK) {
+	if (filepath != pathd) {
 		modified = true;
-		nodes.put("Preprocess.DARK.<xmlattr>.Path", pathDARK = filepath);
+		nodes.put("Preprocess.DARK.<xmlattr>.Path", pathd = filepath);
 	}
 }
 
 void Parameter::UpdateFLAT(const string &filepath) {
-	if (filepath != pathFLAT) {
+	if (filepath != pathf) {
 		modified = true;
-		nodes.put("Preprocess.FLAT.<xmlattr>.Path", pathFLAT = filepath);
+		nodes.put("Preprocess.FLAT.<xmlattr>.Path", pathf = filepath);
 	}
 }
 
 void Parameter::save() {
 	xml_writer_settings<string> settings(' ', 4);
-	write_xml(filepath, nodes, std::locale(), settings);
+	write_xml(filepath, nodes, locale(), settings);
 	modified = false;
 }
 
 void Parameter::split2int(const string & str, int &v1, int &v2) {
 	string::size_type n;
-	if ((n = str.find(',')) == string::npos) v1 = v2 = std::stoi(str);
+	if ((n = str.find(',')) == string::npos) v1 = v2 = stoi(str);
 	else {
-		v1 = std::stoi(str.substr(0, n));
-		v2 = std::stoi(str.substr(n + 1));
+		v1 = stoi(str.substr(0, n));
+		v2 = stoi(str.substr(n + 1));
 	}
 }

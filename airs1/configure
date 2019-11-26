@@ -625,6 +625,14 @@ LIBOBJS
 EGREP
 GREP
 CPP
+DEBUG_FALSE
+DEBUG_TRUE
+OSX_FALSE
+OSX_TRUE
+WINDOWS_FALSE
+WINDOWS_TRUE
+LINUX_FALSE
+LINUX_TRUE
 am__fastdepCC_FALSE
 am__fastdepCC_TRUE
 CCDEPMODE
@@ -730,6 +738,7 @@ ac_user_opts='
 enable_option_checking
 enable_silent_rules
 enable_dependency_tracking
+enable_debug
 '
       ac_precious_vars='build_alias
 host_alias
@@ -1368,6 +1377,7 @@ Optional Features:
                           do not reject slow dependency extractors
   --disable-dependency-tracking
                           speeds up one-time build
+  --enable-debug          enable debugging, default: no
 
 Some influential environment variables:
   CXX         C++ compiler command
@@ -4401,6 +4411,76 @@ fi
 
 CXXFLAGS="-std=c++0x"
 
+# AC_CANONICAL_HOST is needed to access the 'host_os' variable
+
+
+build_linux=no
+build_windows=no
+build_mac=no
+
+# Detect the target system
+case "${host_os}" in
+    linux*)
+        build_linux=yes
+        ;;
+    cygwin*|mingw*)
+        build_windows=yes
+        ;;
+    darwin*)
+        build_mac=yes
+        ;;
+    *)
+        as_fn_error $? "\"OS $host_os is not supported\"" "$LINENO" 5
+        ;;
+esac
+
+# Pass the conditionals to automake
+ if test "$build_linux" = "yes"; then
+  LINUX_TRUE=
+  LINUX_FALSE='#'
+else
+  LINUX_TRUE='#'
+  LINUX_FALSE=
+fi
+
+ if test "$build_windows" = "yes"; then
+  WINDOWS_TRUE=
+  WINDOWS_FALSE='#'
+else
+  WINDOWS_TRUE='#'
+  WINDOWS_FALSE=
+fi
+
+ if test "$build_mac" = "yes"; then
+  OSX_TRUE=
+  OSX_FALSE='#'
+else
+  OSX_TRUE='#'
+  OSX_FALSE=
+fi
+
+
+# Check whether --enable-debug was given.
+if test "${enable_debug+set}" = set; then :
+  enableval=$enable_debug; case "${enableval}" in
+             yes) debug=true ;;
+             no)  debug=false ;;
+             *)   as_fn_error $? "bad value ${enableval} for --enable-debug" "$LINENO" 5 ;;
+esac
+else
+  debug=false
+fi
+
+
+ if test x"$debug" = x"true"; then
+  DEBUG_TRUE=
+  DEBUG_FALSE='#'
+else
+  DEBUG_TRUE='#'
+  DEBUG_FALSE=
+fi
+
+
 
 ac_ext=c
 ac_cpp='$CPP $CPPFLAGS'
@@ -4811,7 +4891,7 @@ fi
 
 done
 
-for ac_func in mkdir strstr
+for ac_func in mkdir strstr memset pow sqrt
 do :
   as_ac_var=`$as_echo "ac_cv_func_$ac_func" | $as_tr_sh`
 ac_fn_c_check_func "$LINENO" "$ac_func" "$as_ac_var"
@@ -5048,6 +5128,22 @@ Usually this means the macro was only invoked conditionally." "$LINENO" 5
 fi
 if test -z "${am__fastdepCC_TRUE}" && test -z "${am__fastdepCC_FALSE}"; then
   as_fn_error $? "conditional \"am__fastdepCC\" was never defined.
+Usually this means the macro was only invoked conditionally." "$LINENO" 5
+fi
+if test -z "${LINUX_TRUE}" && test -z "${LINUX_FALSE}"; then
+  as_fn_error $? "conditional \"LINUX\" was never defined.
+Usually this means the macro was only invoked conditionally." "$LINENO" 5
+fi
+if test -z "${WINDOWS_TRUE}" && test -z "${WINDOWS_FALSE}"; then
+  as_fn_error $? "conditional \"WINDOWS\" was never defined.
+Usually this means the macro was only invoked conditionally." "$LINENO" 5
+fi
+if test -z "${OSX_TRUE}" && test -z "${OSX_FALSE}"; then
+  as_fn_error $? "conditional \"OSX\" was never defined.
+Usually this means the macro was only invoked conditionally." "$LINENO" 5
+fi
+if test -z "${DEBUG_TRUE}" && test -z "${DEBUG_FALSE}"; then
+  as_fn_error $? "conditional \"DEBUG\" was never defined.
 Usually this means the macro was only invoked conditionally." "$LINENO" 5
 fi
 

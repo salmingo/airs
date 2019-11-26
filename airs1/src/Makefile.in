@@ -90,6 +90,8 @@ build_triplet = @build@
 host_triplet = @host@
 target_triplet = @target@
 bin_PROGRAMS = airs1$(EXEEXT)
+@LINUX_TRUE@am__append_1 = -lboost_thread -lrt
+@OSX_TRUE@am__append_2 = -lboost_thread-mt
 subdir = src
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/configure.ac
@@ -102,11 +104,12 @@ CONFIG_CLEAN_FILES =
 CONFIG_CLEAN_VPATH_FILES =
 am__installdirs = "$(DESTDIR)$(bindir)"
 PROGRAMS = $(bin_PROGRAMS)
-am_airs1_OBJECTS = Parameter.$(OBJEXT) GLog.$(OBJEXT) \
-	ADIReduct.$(OBJEXT) ADIProcess.$(OBJEXT) airs.$(OBJEXT)
+am_airs1_OBJECTS = Parameter.$(OBJEXT) ADIReduct.$(OBJEXT) \
+	ADIProcess.$(OBJEXT) AStarMatch.$(OBJEXT) airs.$(OBJEXT)
 airs1_OBJECTS = $(am_airs1_OBJECTS)
 am__DEPENDENCIES_1 =
-airs1_DEPENDENCIES = $(am__DEPENDENCIES_1)
+airs1_DEPENDENCIES = $(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1)
 airs1_LINK = $(CXXLD) $(AM_CXXFLAGS) $(CXXFLAGS) $(airs1_LDFLAGS) \
 	$(LDFLAGS) -o $@
 AM_V_P = $(am__v_P_@AM_V@)
@@ -125,7 +128,7 @@ DEFAULT_INCLUDES = -I.@am__isrc@ -I$(top_builddir)
 depcomp = $(SHELL) $(top_srcdir)/depcomp
 am__maybe_remake_depfiles = depfiles
 am__depfiles_remade = ./$(DEPDIR)/ADIProcess.Po \
-	./$(DEPDIR)/ADIReduct.Po ./$(DEPDIR)/GLog.Po \
+	./$(DEPDIR)/ADIReduct.Po ./$(DEPDIR)/AStarMatch.Po \
 	./$(DEPDIR)/Parameter.Po ./$(DEPDIR)/airs.Po
 am__mv = mv -f
 CXXCOMPILE = $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) \
@@ -141,6 +144,18 @@ AM_V_CXXLD = $(am__v_CXXLD_@AM_V@)
 am__v_CXXLD_ = $(am__v_CXXLD_@AM_DEFAULT_V@)
 am__v_CXXLD_0 = @echo "  CXXLD   " $@;
 am__v_CXXLD_1 = 
+COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
+	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
+AM_V_CC = $(am__v_CC_@AM_V@)
+am__v_CC_ = $(am__v_CC_@AM_DEFAULT_V@)
+am__v_CC_0 = @echo "  CC      " $@;
+am__v_CC_1 = 
+CCLD = $(CC)
+LINK = $(CCLD) $(AM_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
+AM_V_CCLD = $(am__v_CCLD_@AM_V@)
+am__v_CCLD_ = $(am__v_CCLD_@AM_DEFAULT_V@)
+am__v_CCLD_0 = @echo "  CCLD    " $@;
+am__v_CCLD_1 = 
 SOURCES = $(airs1_SOURCES)
 DIST_SOURCES = $(airs1_SOURCES)
 am__can_run_installinfo = \
@@ -272,11 +287,17 @@ target_vendor = @target_vendor@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-airs1_SOURCES = Parameter.cpp GLog.cpp ADIReduct.cpp ADIProcess.cpp airs.cpp
-AM_CPPFLAGS = -DDEBUG 
+airs1_SOURCES = Parameter.cpp ADIReduct.cpp ADIProcess.cpp ProjectTNX.hpp AStarMatch.cpp \
+              airs.cpp
+
+@DEBUG_FALSE@AM_CFLAGS = -O3 -Wall
+@DEBUG_TRUE@AM_CFLAGS = -g3 -O0 -Wall -DNDEBUG
+@DEBUG_FALSE@AM_CXXFLAGS = -O3 -Wall
+@DEBUG_TRUE@AM_CXXFLAGS = -g3 -O0 -Wall -DNDEBUG
 airs1_LDFLAGS = -L/usr/local/lib
-BOOST_LIBS = -lboost_system -lboost_date_time -lboost_thread-mt -lboost_filesystem -lboost_chrono -lboost_regex
-airs1_LDADD = ${BOOST_LIBS} -lm -lpthread -lcurl -lcfitsio 
+BOOST_LIBS = -lboost_system-mt -lboost_date_time-mt -lboost_filesystem-mt -lboost_chrono -lboost_regex-mt
+airs1_LDADD = ${BOOST_LIBS} -lm -lpthread -lcfitsio $(am__append_1) \
+	$(am__append_2)
 all: all-am
 
 .SUFFIXES:
@@ -365,7 +386,7 @@ distclean-compile:
 
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ADIProcess.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ADIReduct.Po@am__quote@ # am--include-marker
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/GLog.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/AStarMatch.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/Parameter.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/airs.Po@am__quote@ # am--include-marker
 
@@ -518,7 +539,7 @@ clean-am: clean-binPROGRAMS clean-generic mostlyclean-am
 distclean: distclean-am
 		-rm -f ./$(DEPDIR)/ADIProcess.Po
 	-rm -f ./$(DEPDIR)/ADIReduct.Po
-	-rm -f ./$(DEPDIR)/GLog.Po
+	-rm -f ./$(DEPDIR)/AStarMatch.Po
 	-rm -f ./$(DEPDIR)/Parameter.Po
 	-rm -f ./$(DEPDIR)/airs.Po
 	-rm -f Makefile
@@ -568,7 +589,7 @@ installcheck-am:
 maintainer-clean: maintainer-clean-am
 		-rm -f ./$(DEPDIR)/ADIProcess.Po
 	-rm -f ./$(DEPDIR)/ADIReduct.Po
-	-rm -f ./$(DEPDIR)/GLog.Po
+	-rm -f ./$(DEPDIR)/AStarMatch.Po
 	-rm -f ./$(DEPDIR)/Parameter.Po
 	-rm -f ./$(DEPDIR)/airs.Po
 	-rm -f Makefile

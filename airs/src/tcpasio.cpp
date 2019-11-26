@@ -2,6 +2,7 @@
  * @file tcpasio.cpp 定义文件, 基于boost::asio实现TCP通信接口
  */
 
+#include <boost/make_shared.hpp>
 #include <boost/lexical_cast.hpp>
 #include "tcpasio.h"
 
@@ -74,12 +75,12 @@ void TCPClient::UseBuffer(bool usebuf) {
 	if (usebuf_ != usebuf) {
 		usebuf_ = usebuf;
 		if (usebuf_) {
-			crcread_.set_capacity(TCP_PACK_SIZE * 100);
-			crcwrite_.set_capacity(TCP_PACK_SIZE * 100);
+			crcrcv_.set_capacity(TCP_PACK_SIZE * 100);
+			crcsnd_.set_capacity(TCP_PACK_SIZE * 100);
 		}
 		else {
-			crcread_.clear();
-			crcwrite_.clear();
+			crcrcv_.clear();
+			crcsnd_.clear();
 		}
 	}
 }
@@ -96,37 +97,37 @@ void TCPClient::RegisterConnect(const CBSlot& slot) {
  * @brief 注册回调函数
  */
 void TCPClient::RegisterRead(const CBSlot& slot) {
-	mutex_lock lck(mtxread_);
-	if (!cbread_.empty()) cbread_.disconnect_all_slots();
-	cbread_.connect(slot);
+	mutex_lock lck(mtxrcv_);
+	if (!cbrcv_.empty()) cbrcv_.disconnect_all_slots();
+	cbrcv_.connect(slot);
 }
 
 /*
  * @brief 注册回调函数
  */
 void TCPClient::RegisterWrite(const CBSlot& slot) {
-	mutex_lock lck(mtxwrite_);
-	if (!cbwrite_.empty()) cbwrite_.disconnect_all_slots();
-	cbwrite_.connect(slot);
+	mutex_lock lck(mtxsnd_);
+	if (!cbsnd_.empty()) cbsnd_.disconnect_all_slots();
+	cbsnd_.connect(slot);
 }
 
 int TCPClient::Lookup(char* first) {
-	int n = usebuf_ ? crcread_.size() : bytercv_;
+	int n = usebuf_ ? crcrcv_.size() : bytercv_;
 	if (!(first && n)) return -1;
-	*first = usebuf_ ? crcread_[0] : bufrcv_[0];
+	*first = usebuf_ ? crcrcv_[0] : bufrcv_[0];
 	return n;
 }
 
 int TCPClient::Lookup(const char* flag, const int len, const int from) {
 	if (!flag || len <= 0 || from < 0) return -1;
 
-	int n = usebuf_ ? (crcread_.size() - len) : (bytercv_ - len);
+	int n = usebuf_ ? (crcrcv_.size() - len) : (bytercv_ - len);
 	int i(-1), j, pos;
 
 	if (usebuf_) {
-		mutex_lock lck(mtxread_);
+		mutex_lock lck(mtxrcv_);
 		for (pos = from; i != len && pos <= n; ++pos) {
-			for (i = 0, j = pos; i < len && flag[i] == crcread_[j]; ++i, ++j);
+			for (i = 0, j = pos; i < len && flag[i] == crcrcv_[j]; ++i, ++j);
 		}
 	}
 	else {
@@ -134,22 +135,22 @@ int TCPClient::Lookup(const char* flag, const int len, const int from) {
 			for (i = 0, j = pos; i < len && flag[i] == bufrcv_[j]; ++i, ++j);
 		}
 	}
-	return i != len ? -1 : (pos - 1);
+	return i != len ? (n < TCP_PACK_SIZE ? -1 : n) : (pos - 1);
 }
 
 int TCPClient::Read(char* buff, const int len, const int from) {
 	if (!buff || len <= 0 || from < 0) return 0;
 
-	mutex_lock lck(mtxread_);
+	mutex_lock lck(mtxrcv_);
 	int n0(from + len), i(0), j;
 	if (usebuf_) {
-		int n(crcread_.size());
+		int n(crcrcv_.size());
 		if (n > n0) n = n0;
-		for (j = from; j < n; ++i, ++j) buff[i] = crcread_[j];
+		for (j = from; j < n; ++i, ++j) buff[i] = crcrcv_[j];
 		if (i) {
-			crcread_.erase_begin(i);
+			crcrcv_.erase_begin(i);
 			if (pause_rcv_) {
-				pause_rcv_ = (crcread_.capacity() - crcread_.size()) < TCP_PACK_SIZE;
+				pause_rcv_ = (crcrcv_.capacity() - crcrcv_.size()) < TCP_PACK_SIZE;
 				if (!pause_rcv_) start_read();
 			}
 		}
@@ -168,12 +169,12 @@ int TCPClient::Read(char* buff, const int len, const int from) {
 int TCPClient::Write(const char* buff, const int len) {
 	if (!buff || len <= 0) return 0;
 
-	mutex_lock lck(mtxwrite_);
+	mutex_lock lck(mtxsnd_);
 	int n;
 	if (usebuf_) {
-		int n0(crcwrite_.size()), i;
-		if ((n = crcwrite_.capacity() - n0) > len) n = len;
-		for (i = 0; i < n; ++i) crcwrite_.push_back(buff[i]);
+		int n0(crcsnd_.size()), i;
+		if ((n = crcsnd_.capacity() - n0) > len) n = len;
+		for (i = 0; i < n; ++i) crcsnd_.push_back(buff[i]);
 		if (!n0 && n) start_write();
 	}
 	else {
@@ -192,22 +193,22 @@ void TCPClient::handle_connect(const boost::system::error_code& ec) {
 
 void TCPClient::handle_read(const boost::system::error_code& ec, int n) {
 	if (!ec){
-		mutex_lock lock(mtxread_);
+		mutex_lock lock(mtxrcv_);
 		if (usebuf_) {
-			for(int i = 0; i < n; ++i) crcread_.push_back(bufrcv_[i]);
-			pause_rcv_ = (crcread_.capacity() - crcread_.size()) < TCP_PACK_SIZE;
+			for(int i = 0; i < n; ++i) crcrcv_.push_back(bufrcv_[i]);
+			pause_rcv_ = (crcrcv_.capacity() - crcrcv_.size()) < TCP_PACK_SIZE;
 		}
 		else bytercv_ = n;
 	}
-	if (!cbread_.empty()) cbread_((const long) this, ec.value());
+	if (!cbrcv_.empty()) cbrcv_((const long) this, ec.value());
 	if (!(ec || pause_rcv_)) start_read();
 }
 
 void TCPClient::handle_write(const boost::system::error_code& ec, int n) {
 	if (!ec) {
-		mutex_lock lock(mtxwrite_);
-		crcwrite_.erase_begin(n);
-		if (!cbwrite_.empty()) cbwrite_((const long) this, n);
+		mutex_lock lock(mtxsnd_);
+		crcsnd_.erase_begin(n);
+		if (!cbsnd_.empty()) cbsnd_((const long) this, n);
 		start_write();
 	}
 }
@@ -221,17 +222,19 @@ void TCPClient::start_read() {
 }
 
 void TCPClient::start_write() {
-	int n(crcwrite_.size());
+	int n(crcsnd_.size());
 	if (n) {
-		sock_.async_write_some(buffer(crcwrite_.linearize(), n),
+		sock_.async_write_some(buffer(crcsnd_.linearize(), n),
 				boost::bind(&TCPClient::handle_write, this,
 						placeholders::error, placeholders::bytes_transferred));
 	}
 }
 
 void TCPClient::start() {
-	sock_.set_option(socket_base::keep_alive(true));
-	start_read();
+	if (sock_.is_open()) {
+		sock_.set_option(socket_base::keep_alive(true));
+		start_read();
+	}
 }
 
 //////////////////////////////////////////////////////////////////////////////

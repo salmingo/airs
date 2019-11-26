@@ -1,4 +1,4 @@
-/*
+/**
  * @file daemon.cpp 将软件转换为守护进程的几个函数
  * @date 2017-01-19
  * @version 0.2

@@ -23,13 +23,10 @@
 #include <vector>
 #include "globaldef.h"
 #include "Parameter.h"
-#include "GLog.h"
 #include "ADIProcess.h"
 
 using namespace AstroUtil;
 typedef std::vector<string> strvector;
-
-GLog _gLog(stdout);
 
 //////////////////////////////////////////////////////////////////////////////
 /*!

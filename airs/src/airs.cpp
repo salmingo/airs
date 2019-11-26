@@ -16,6 +16,8 @@
 #include <getopt.h>
 #include <string>
 #include <thread>
+#include <vector>
+#include <algorithm>
 #include <boost/make_shared.hpp>
 #include "globaldef.h"
 #include "Parameter.h"
@@ -23,8 +25,10 @@
 #include "GLog.h"
 #include "DoProcess.h"
 
-using std::string;
+using namespace std;
+using namespace boost::posix_time;
 
+typedef vector<string> vecstr;
 boost::shared_ptr<GLog> _gLog;
 
 /*!
@@ -102,7 +106,14 @@ int main(int argc, char **argv) {
 	if (doProcess->StartService(is_daemon, &ios)) {
 		if (is_daemon) _gLog->Write("Daemon goes running");
 		if (!is_daemon) {
-			for (int i = 0; i < argc; ++i) doProcess->ProcessImage(argv[i]);
+			vecstr files;
+			for (int i = 0; i < argc; ++i) {
+				files.push_back(argv[i]);
+			}
+			sort(files.begin(), files.end(), [](const string &name1, const string &name2) {
+				return name1 < name2;
+			});
+			for (int i = 0; i < argc; ++i) 	doProcess->ProcessImage(files[i]);
 		}
 		ios.run();
 		if (is_daemon) _gLog->Write("Daemon stop running");

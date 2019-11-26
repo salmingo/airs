@@ -6,11 +6,14 @@
 
 #include <boost/make_shared.hpp>
 #include <boost/filesystem.hpp>
+#include <boost/date_time/posix_time/posix_time.hpp>
 #include "DoProcess.h"
 #include "GLog.h"
 #include "globaldef.h"
 
+using namespace boost;
 using namespace boost::filesystem;
+using namespace boost::posix_time;
 
 DoProcess::DoProcess() {
 	asdaemon_   = false;
@@ -26,93 +29,202 @@ bool DoProcess::StartService(bool asdaemon, boost::asio::io_service *ios) {
 	asdaemon_ = asdaemon;
 	ios_ = ios;
 	param_.LoadFile(gConfigPath);
+	logcal_ = boost::make_shared<LogCalibrated>(param_.pathOutput);
 
 	/* 启动服务 */
-	register_messages();
-	std::string name = "msgque_";
-	name += DAEMON_NAME;
-	if (!Start(name.c_str())) return false;
+	create_objects();
 	if (asdaemon) {/* 为成员变量分配资源 */
+		register_messages();
+		std::string name = "msgque_";
+		name += DAEMON_NAME;
+		if (!Start(name.c_str())) return false;
 		if (!connect_server_gc()) return false;
 		if (!connect_server_fileserver()) return false;
-		if (param_.dbEnable && !param_.dbUrl.empty()) {
-			db_.reset(new WataDataTransfer(param_.dbUrl.c_str()));
-		}
 	}
-	create_objects();
-	thrd_complete_.reset(new boost::thread(boost::bind(&DoProcess::thread_complete, this)));
 
 	return true;
 }
 
 void DoProcess::StopService() {
 	Stop();
-	interrupt_thread(thrd_complete_);
+	interrupt_thread(thrd_reduct_);
+	interrupt_thread(thrd_astro_);
+	interrupt_thread(thrd_photo_);
 	interrupt_thread(thrd_reconn_gc_);
 	interrupt_thread(thrd_reconn_fileserver_);
 }
 
 void DoProcess::ProcessImage(const string &filepath) {
-	mutex_lock lck(mtx_frame_);
+	mutex_lock lck(mtx_frm_reduct_);
 	FramePtr frame = boost::make_shared<OneFrame>();
 	frame->filepath = filepath;
-	allframe_.push_back(frame);
-	PostMessage(MSG_NEW_IMAGE);
+	queReduct_.push_back(frame);
+	cv_reduct_.notify_one();
 }
 
 //////////////////////////////////////////////////////////////////////////////
 /* 处理结果回调函数 */
-void DoProcess::ImageReductResult(bool rslt, const long addr, double fwhm) {
-	OneFrame *frame = (OneFrame*) addr;
-	if (rslt && tcpc_gc_.unique()) {// 通知服务器FWHM
+void DoProcess::ImageReductResult(bool rslt) {
+	FramePtr frame = reduct_->GetFrame();
+	if (rslt) {
+		mutex_lock lck(mtx_frm_astro_);
+		queAstro_.push_back(frame);
+		cv_astro_.notify_one();
+	}
+	if (rslt && tcpc_gc_.unique() && frame->fwhm > 1E-4) {// 通知服务器FWHM
 		apfwhm proto = boost::make_shared<ascii_proto_fwhm>();
-		proto->gid = frame->gid;
-		proto->uid = frame->uid;
-		proto->cid = frame->cid;
-		proto->value = fwhm;
+		proto->gid   = frame->gid;
+		proto->uid   = frame->uid;
+		proto->cid   = frame->cid;
+		proto->value = frame->fwhm;
 
 		int n;
 		const char *s = ascproto_->CompactFWHM(proto, n);
 		tcpc_gc_->Write(s, n);
 	}
-	if (rslt && (param_.doAstrometry || param_.doPhotometry)) {
-		PostMessage(MSG_NEW_ASTROMETRY);
-	}
-	else {
-		if (rslt) frame->result |= SUCCESS_COMPLETE;
-		PostMessage(MSG_COMPLETE_PROCESS);
-	}
+	cv_reduct_.notify_one();
 }
 
-void DoProcess::AstrometryResult(bool rslt, const long addr) {
-	if (rslt && param_.doPhotometry) PostMessage(MSG_NEW_PHOTOMETRY);
-	else {
-		OneFrame *frame = (OneFrame*) addr;
-		if (rslt) frame->result |= SUCCESS_COMPLETE;
-		PostMessage(MSG_COMPLETE_PROCESS);
+void DoProcess::AstrometryResult(int rslt) {
+	FramePtr frame = astro_->GetFrame();
+	if (rslt) {// 测光
+		mutex_lock lck(mtx_frm_photo_);
+		quePhoto_.push_back(frame);
+		cv_photo_.notify_one();
 	}
+	cv_astro_.notify_one();
 }
 
-void DoProcess::PhotometryResult(bool rslt, const long addr) {
-	OneFrame *frame = (OneFrame*) addr;
-	if (rslt) frame->result |= SUCCESS_COMPLETE;
-	PostMessage(MSG_COMPLETE_PROCESS);
+void DoProcess::PhotometryResult(bool rslt) {
+	FramePtr frame = photo_->GetFrame();
+	if (rslt) {
+		logcal_->Write(frame); // 输出定标结果
+		finder_->NewFrame(frame);
+	}
+	cv_photo_.notify_one();
 }
 
 //////////////////////////////////////////////////////////////////////////////
+/* 数据处理 */
 void DoProcess::create_objects() {
-	astrodip_   = boost::make_shared<AstroDIP>(&param_);
-	astrometry_ = boost::make_shared<AstroMetry>(&param_);
-	photometry_ = boost::make_shared<PhotoMetry>();
+	reduct_  = boost::make_shared<AstroDIP>(&param_);
+	astro_   = boost::make_shared<AstroMetry>(&param_);
+	photo_   = boost::make_shared<PhotoMetry>(&param_);
+	finder_  = boost::make_shared<AFindPV>(&param_);
 
-	const AstroDIP::ReductResultSlot       &slot1 = boost::bind(&DoProcess::ImageReductResult, this, _1, _2, _3);
-	const AstroMetry::AstrometryResultSlot &slot2 = boost::bind(&DoProcess::AstrometryResult,  this, _1, _2);
-	const PhotoMetry::PhotometryResultSlot &slot3 = boost::bind(&DoProcess::PhotometryResult,  this, _1, _2);
-	astrodip_->RegisterReductResult(slot1);
-	astrometry_->RegisterAstrometryResult(slot2);
-	photometry_->RegisterPhotometryResult(slot3);
+	const AstroDIP::ReductResultSlot       &slot1 = boost::bind(&DoProcess::ImageReductResult, this, _1);
+	const AstroMetry::AstrometryResultSlot &slot2 = boost::bind(&DoProcess::AstrometryResult,  this, _1);
+	const PhotoMetry::PhotometryResultSlot &slot3 = boost::bind(&DoProcess::PhotometryResult,  this, _1);
+	reduct_->RegisterReductResult(slot1);
+	astro_->RegisterAstrometryResult(slot2);
+	photo_->RegisterPhotometryResult(slot3);
+
+	thrd_reduct_.reset(new thread(boost::bind(&DoProcess::thread_reduct, this)));
+	thrd_astro_.reset(new thread(boost::bind(&DoProcess::thread_astro,   this)));
+	thrd_photo_.reset(new thread(boost::bind(&DoProcess::thread_photo,   this)));
+
+	boost::this_thread::sleep_for(boost::chrono::milliseconds(500));
 }
 
+bool DoProcess::check_image(FramePtr frame) {
+	fitsfile *fitsptr;	//< 基于cfitsio接口的文件操作接口
+	int status(0);
+	char dateobs[30], timeobs[30], temp[30];
+	bool datefull;
+	double expdur;
+
+	fits_open_file(&fitsptr, frame->filepath.c_str(), 0, &status);
+	fits_read_key(fitsptr, TINT, "NAXIS1", &frame->wimg, NULL, &status);
+	fits_read_key(fitsptr, TINT, "NAXIS2", &frame->himg, NULL, &status);
+	fits_read_key(fitsptr, TSTRING, "DATE-OBS", dateobs,  NULL, &status);
+	if (!(datefull = NULL != strstr(dateobs, "T")))
+		fits_read_key(fitsptr, TSTRING, "TIME-OBS", timeobs,  NULL, &status);
+	fits_read_key(fitsptr, TDOUBLE, "EXPTIME",  &expdur, NULL, &status);
+	if (!status) {
+		fits_read_key(fitsptr, TINT, "FRAMENO",  &frame->fno, NULL, &status);
+		status = 0;
+	}
+	frame->expdur = expdur;
+	if (!status) {// 不存在关键字的特殊处理
+		fits_read_key(fitsptr, TSTRING, "GROUP_ID", temp, NULL, &status);
+		frame->gid = temp;
+		fits_read_key(fitsptr, TSTRING, "UNIT_ID", temp, NULL, &status);
+		frame->uid = temp;
+		fits_read_key(fitsptr, TSTRING, "CAM_ID", temp, NULL, &status);
+		frame->cid = temp;
+		status = 0;
+	}
+	fits_close_file(fitsptr, &status);
+
+	if (!status) {
+		path filepath(frame->filepath);
+		char tmfull[40];
+
+		frame->filename = filepath.filename().string();
+		if (!datefull) sprintf(tmfull, "%sT%s", dateobs, timeobs);
+		frame->tmobs = datefull ? dateobs : tmfull;
+		ptime tmobs  = from_iso_extended_string(frame->tmobs);
+		ptime tmmid  = tmobs + millisec(int(expdur * 500.0 + 0.36)); // 0.36: rolling cmos ??
+		frame->tmmid = to_iso_extended_string(tmmid);
+		frame->secofday = tmmid.time_of_day().total_milliseconds() / 86400000.0;
+		frame->mjd      = tmmid.date().modjulian_day() + frame->secofday;
+	}
+	return (status == 0);
+}
+
+void DoProcess::thread_reduct() {
+	boost::mutex mtx;
+	mutex_lock lck(mtx);
+
+	while (1) {
+		cv_reduct_.wait(lck);
+
+		while (!reduct_->IsWorking() && queReduct_.size()) {
+			mutex_lock lck1(mtx_frm_reduct_);
+			FramePtr frame;
+			frame = queReduct_.front();
+			queReduct_.pop_front();
+			if (check_image(frame)) reduct_->DoIt(frame);
+		}
+	}
+}
+
+void DoProcess::thread_astro() {
+	boost::mutex mtx;
+	mutex_lock lck(mtx);
+
+	while (1) {
+		cv_astro_.wait(lck);
+
+		while (!astro_->IsWorking() && queAstro_.size()) {
+			mutex_lock lck1(mtx_frm_astro_);
+			FramePtr frame;
+			frame = queAstro_.front();
+			queAstro_.pop_front();
+			astro_->DoIt(frame);
+		}
+	}
+}
+
+void DoProcess::thread_photo() {
+	boost::mutex mtx;
+	mutex_lock lck(mtx);
+
+	while (1) {
+		cv_photo_.wait(lck);
+
+		while (!photo_->IsWorking() && quePhoto_.size()) {
+			mutex_lock lck1(mtx_frm_photo_);
+			FramePtr frame;
+			frame = quePhoto_.front();
+			quePhoto_.pop_front();
+			photo_->DoIt(frame);
+		}
+	}
+}
+
+//////////////////////////////////////////////////////////////////////////////
+/* 网络通信 */
 bool DoProcess::connect_server_gc() {
 	if (!param_.gcEnable) return true;
 	const TCPClient::CBSlot &slot = boost::bind(&DoProcess::received_server_gc, this, _1, _2);
@@ -165,30 +277,6 @@ void DoProcess::received_server_fileserver(const long addr, const long ec) {
 	PostMessage(ec ? MSG_CLOSE_FILESERVER : MSG_RECEIVE_FILESERVER);
 }
 
-void DoProcess::thread_complete() {
-	boost::mutex mtx;
-	mutex_lock lck(mtx);
-
-	while(1) {
-		cv_complete_.wait(lck);
-		/* 检查已完成处理的文件 */
-		mutex_lock lck(mtx_frame_);
-		FramePtr frame;
-		int rslt;
-		for (FrameQueue::iterator it = allframe_.begin(); it != allframe_.end();) {
-			rslt = (*it)->result;
-			if (rslt >= 0 && (rslt & SUCCESS_COMPLETE) != SUCCESS_COMPLETE) ++it;
-			else {
-				frame = *it;
-				it = allframe_.erase(it);
-				if (rslt > 0) {// ...处理成功, 关联识别动目标
-
-				}
-			}
-		}
-	}
-}
-
 void DoProcess::thread_reconnect_gc() {
 	boost::chrono::minutes period(1);
 
@@ -215,105 +303,24 @@ void DoProcess::thread_reconnect_fileserver() {
 		tcpc_fs_ = maketcp_client();
 		tcpc_fs_->RegisterConnect(slot1);
 		tcpc_fs_->RegisterRead(slot2);
-		tcpc_fs_->AsyncConnect(param_.gcIPv4, param_.gcPort);
+		tcpc_fs_->AsyncConnect(param_.fsIPv4, param_.fsPort);
 	}
 }
 
 //////////////////////////////////////////////////////////////////////////////
 /* 消息响应函数 */
 void DoProcess::register_messages() {
-	const CBSlot &slot1  = boost::bind(&DoProcess::on_new_image,          this, _1, _2);
-	const CBSlot &slot2  = boost::bind(&DoProcess::on_new_astrometry,     this, _1, _2);
-	const CBSlot &slot3  = boost::bind(&DoProcess::on_new_photometry,     this, _1, _2);
-	const CBSlot &slot4  = boost::bind(&DoProcess::on_complete_process,   this, _1, _2);
-	const CBSlot &slot5  = boost::bind(&DoProcess::on_connect_gc,         this, _1, _2);
-	const CBSlot &slot6  = boost::bind(&DoProcess::on_close_gc,           this, _1, _2);
-	const CBSlot &slot7  = boost::bind(&DoProcess::on_connect_fileserver, this, _1, _2);
-	const CBSlot &slot8  = boost::bind(&DoProcess::on_receive_fileserver, this, _1, _2);
-	const CBSlot &slot9  = boost::bind(&DoProcess::on_close_fileserver,   this, _1, _2);
+	const CBSlot &slot1  = boost::bind(&DoProcess::on_connect_gc,         this, _1, _2);
+	const CBSlot &slot2  = boost::bind(&DoProcess::on_close_gc,           this, _1, _2);
+	const CBSlot &slot3  = boost::bind(&DoProcess::on_connect_fileserver, this, _1, _2);
+	const CBSlot &slot4  = boost::bind(&DoProcess::on_receive_fileserver, this, _1, _2);
+	const CBSlot &slot5  = boost::bind(&DoProcess::on_close_fileserver,   this, _1, _2);
 
-	RegisterMessage(MSG_NEW_IMAGE,          slot1);
-	RegisterMessage(MSG_NEW_ASTROMETRY,     slot2);
-	RegisterMessage(MSG_NEW_PHOTOMETRY,     slot3);
-	RegisterMessage(MSG_COMPLETE_PROCESS,   slot4);
-	RegisterMessage(MSG_CONNECT_GC,         slot5);
-	RegisterMessage(MSG_CLOSE_GC,           slot6);
-	RegisterMessage(MSG_CONNECT_FILESERVER, slot7);
-	RegisterMessage(MSG_RECEIVE_FILESERVER, slot8);
-	RegisterMessage(MSG_CLOSE_FILESERVER,   slot9);
-}
-
-void DoProcess::on_new_image(const long, const long) {
-	if (!astrodip_->IsWorking()) {
-		FramePtr frame;
-		if (allframe_.size()) {
-			mutex_lock lck(mtx_frame_);
-			FrameQueue::iterator it;
-			for (it = allframe_.begin(); it != allframe_.end() && (*it)->result != SUCCESS_INIT; ++it);
-			if (it != allframe_.end()) frame = *it;
-		}
-		if (frame.use_count()) {
-			_gLog->Write("Prepare processing %s", frame->filepath.c_str());
-			if (!astrodip_->DoIt(frame)) {
-				frame->result = FAIL_IMGREDUCT;
-				PostMessage(MSG_COMPLETE_PROCESS);
-			}
-		}
-	}
-}
-
-void DoProcess::on_new_astrometry(const long addr, const long) {
-	if (!astrometry_->IsWorking()) {
-		FramePtr frame;
-		if (allframe_.size()) {
-			mutex_lock lck(mtx_frame_);
-			FrameQueue::iterator it;
-			for (it = allframe_.begin(); it != allframe_.end() && (*it)->result != SUCCESS_IMGREDUCT; ++it);
-			if (it != allframe_.end()) frame = *it;
-		}
-		if (frame.use_count()) {
-			_gLog->Write("doing astrometry for %s", frame->filepath.c_str());
-			if (!astrometry_->DoIt(frame)) {
-				frame->result = FAIL_ASTROMETRY;
-				PostMessage(MSG_COMPLETE_PROCESS);
-			}
-		}
-	}
-}
-
-void DoProcess::on_new_photometry(const long addr, const long) {
-	if (!photometry_->IsWorking()) {
-		FramePtr frame;
-		if (allframe_.size()) {
-			mutex_lock lck(mtx_frame_);
-			FrameQueue::iterator it;
-			for (it = allframe_.begin(); it != allframe_.end() && (*it)->result != SUCCESS_ASTROMETRY; ++it);
-			if (it != allframe_.end()) frame = *it;
-		}
-		if (frame.use_count()) {
-			_gLog->Write("doing photometry for %s", frame->filepath.c_str());
-			if (!photometry_->DoIt(frame)) {
-				frame->result = FAIL_PHOTOMETRY;
-				PostMessage(MSG_COMPLETE_PROCESS);
-			}
-		}
-	}
-}
-
-/*
- * rslt定义:
- *  0: 完成完整处理流程
- *  1: 完成图像处理
- *  2: 完成天文定位
- *  3: 完成流量定标
- * -1: 图像处理流程失败
- * -2: 天文流程失败
- * -3: 流量定标流程失败
- */
-void DoProcess::on_complete_process(const long rslt, const long) {
-	cv_complete_.notify_one();
-	// 申请处理新的图像
-	PostMessage(MSG_NEW_IMAGE);
+	RegisterMessage(MSG_CONNECT_GC,         slot1);
+	RegisterMessage(MSG_CLOSE_GC,           slot2);
+	RegisterMessage(MSG_CONNECT_FILESERVER, slot3);
+	RegisterMessage(MSG_RECEIVE_FILESERVER, slot4);
+	RegisterMessage(MSG_CLOSE_FILESERVER,   slot5);
 }
 
 void DoProcess::on_connect_gc(const long, const long) {
@@ -334,35 +341,44 @@ void DoProcess::on_connect_fileserver(const long, const long) {
 }
 
 void DoProcess::on_receive_fileserver(const long, const long) {
-	char term[] = "\n";
-	int len = strlen(term);
-	int pos = tcpc_fs_->Lookup(term, len, 0);
-	apbase base;
+	char term[] = "\n";	   // 换行符作为信息结束标记
+	int len = strlen(term);// 结束符长度
+	int pos;      // 标志符位置
+	int toread;   // 信息长度
+	apbase proto;
 
-	tcpc_fs_->Read(bufrcv_.get(), pos + len, 0);
-	bufrcv_[pos] = 0;
-	base = ascproto_->Resolve(bufrcv_.get());
-	if (base.unique()) {
-		if (base->type == APTYPE_FILEINFO) {
-			// 缓存文件信息
-			apfileinfo fileinfo = from_apbase<ascii_proto_fileinfo>(base);
-			FramePtr frame = boost::make_shared<OneFrame>();
-			path filepath = fileinfo->subpath;
-			filepath /= fileinfo->filename;
-			frame->filepath = filepath.string();
-			frame->gid = fileinfo->gid;
-			frame->uid = fileinfo->uid;
-			frame->cid = fileinfo->cid;
-
-			// 通知可以接收数据
-			mutex_lock lck(mtx_frame_);
-			allframe_.push_back(frame);
-			PostMessage(MSG_NEW_IMAGE);
+	while (tcpc_fs_->IsOpen() && (pos = tcpc_fs_->Lookup(term, len)) >= 0) {
+		if ((toread = pos + len) > TCP_PACK_SIZE) {
+			_gLog->Write(LOG_FAULT, "DoProcess::on_receive_fileserver()",
+					"too long message from");
+			tcpc_fs_->Close();
 		}
-	}
-	else {
-		_gLog->Write(LOG_FAULT, NULL, "wrong communication");
-		tcpc_fs_->Close();
+		else {// 读取协议内容并解析执行
+			tcpc_fs_->Read(bufrcv_.get(), toread);
+			bufrcv_[pos] = 0;
+			proto = ascproto_->Resolve(bufrcv_.get());
+			if (!proto.unique()) {
+				_gLog->Write(LOG_FAULT, "DoProcess::on_receive_fileserver()",
+						"illegal protocol [%s]", bufrcv_.get());
+				tcpc_fs_->Close();
+			}
+			else if (proto->type == APTYPE_FILEINFO) {
+				// 缓存文件信息
+				apfileinfo fileinfo = from_apbase<ascii_proto_fileinfo>(proto);
+				FramePtr frame = boost::make_shared<OneFrame>();
+				path filepath = fileinfo->subpath;
+				filepath /= fileinfo->filename;
+				frame->filepath = filepath.string();
+				frame->gid = fileinfo->gid;
+				frame->uid = fileinfo->uid;
+				frame->cid = fileinfo->cid;
+
+				// 通知可以接收数据
+				mutex_lock lck(mtx_frm_reduct_);
+				queReduct_.push_back(frame);
+				cv_reduct_.notify_one();
+			}
+		}
 	}
 }
 

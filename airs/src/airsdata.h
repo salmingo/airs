@@ -12,16 +12,13 @@
 #include <deque>
 #include <vector>
 #include <boost/smart_ptr.hpp>
+#include <string.h>
 #include <longnam.h>
 #include <fitsio.h>
-#include <math.h>
+#include "ADefine.h"
 
 using std::string;
-// 调整到[0, T)周期内
-#define A2PI	6.283185307179586476925287		//< 2倍圆周率
-#define R2D		5.729577951308232087679815E1	//< 弧度转换为角度
-#define D2R		1.745329251994329576923691E-2	//< 角度转换为弧度
-#define cyclemod(x, T)	((x) - floor((x) / (T)) * (T))
+using namespace AstroUtil;
 
 #define FAIL_IMGREDUCT		-1		//< 图像处理失败
 #define FAIL_ASTROMETRY		-2		//< 天文定位失败
@@ -35,178 +32,51 @@ using std::string;
 #define PROCESS_ASTROMETRY	0x12	//< 执行天文定位
 #define PROCESS_PHOTOMETRY	0x13	//< 执行流量定标
 
+enum {
+	NDX_X,
+	NDX_Y,
+	NDX_FLUX,
+	NDX_MAG,
+	NDX_MAGERR,
+	NDX_FWHM,
+	NDX_ELLIP,
+	NDX_BACK,
+	NDX_MAX
+};
+
 /*!
- * @struct OneBody 单个天体的特征信息
+ * @struct ObjectInfo 单个天体的特征信息
  */
-struct OneBody {
+struct ObjectInfo {
 	/* 图像处理结果 */
-	double x;	//< 图像坐标
-	double y;
-	double mag_img;	//< 仪器星等, 零点: -25.0, 归算为1秒
-	double fwhm;	//< FWHM
-	double ellip;	//< 椭率. 0: 圆; 1: 线
+	int id;		//< 在图像中的编号
+	double features[NDX_MAX];	//< 天体测量特征值
 	/* 天文定位 */
-	double ra_img;	//< 赤道坐标, J2000, 量纲: 角度
-	double dec_img;
+	double ra_fit;	//< 赤道坐标, J2000, 量纲: 角度
+	double dec_fit;
 	/* 流量定标 */
-	bool matched;	//< 星表匹配结果
-	double ra_cat;	//< 星表坐标, J2000, 量纲: 角度
+	/*!
+	 * @var matched 恒星匹配结果
+	 * 0 : 未匹配
+	 * 1 : 与星表匹配成功
+	 * 2 : 坏像素/热点
+	 * 3 : 前后关联匹配成功
+	 */
+	int matched;
+	double ra_cat;	//< 星表坐标+自行改正, J2000, 量纲: 角度
 	double dec_cat;
-	double mag_cat;	//< V星等
-};
-typedef std::vector<OneBody> BodyVector;	//< 一帧图像中提取的天体集合
-
-struct wcsinfo {
-	int x1, y1, x2, y2;	//< 在全图中的XY左上角与右下角坐标
-	double x0, y0;	//< XY参考点
-	double r0, d0;	//< RA/DEC参考点, 量纲: 弧度
-	double cd[2][2];	//< 转换矩阵
-	int orderA, orderB;	//< SIP改正阶数
-	int ncoefA, ncoefB;	//< SIP系数数量
-	double *A, *B;	//< 线性改正系数
+	double mag_cat;	//< V星等: 星表. 无效值: 20
+	double mag_fit;	//< V星等: 拟合
 
 public:
-	wcsinfo() {
-		x1 = y1 = 0;
-		x2 = y2 = 0;
-		x0 = y0 = 0.0;
-		r0 = d0 = 0.0;
-		orderA = orderB = 0;
-		ncoefA = ncoefB = 0;
-		A = B = NULL;
-	}
-
-	virtual ~wcsinfo() {
-		if (A) {
-			delete[] A;
-			A = NULL;
-		}
-		if (B) {
-			delete[] B;
-			B = NULL;
-		}
-	}
-
-protected:
-	/*!
-	 * @brief 计算SIP改正模型中与阶数对应的系数数量
-	 * @return
-	 * 系数数量
-	 */
-	int term_count(int order) {
-		return (order + 1) * (order + 2) / 2;
-	}
-
-	/*!
-	 * @brief 为SIP改正系数分配存储空间
-	 * @param n   系数数量
-	 * @param ptr 系数存储地址
-	 */
-	void alloc_coef(int n, double **ptr) {
-		if ((ptr == &A && n != ncoefA) || (ptr == &B && n != ncoefA)) {
-			if (ptr == &A)
-				ncoefA = n;
-			else
-				ncoefB = n;
-			if (*ptr) {
-				delete[] (*ptr);
-				(*ptr) = NULL;
-			}
-		}
-		if (*ptr == NULL)
-			(*ptr) = new double[n];
-	}
-
-	void plane_to_wcs(double xi, double eta, double &ra, double &dec) {
-		double fract = cos(d0) - eta * sin(d0);
-		ra = cyclemod(r0 + atan2(xi, fract), A2PI);
-		dec = atan2(((eta * cos(d0) + sin(d0)) * cos(ra - r0)), fract);
-	}
-
-	double poly_val(double x, double y, double *coef, int order) {
-		int i, j, k, m;
-		double val(0.0), t, px(1.0), py;
-
-		for (i = 0, k = 0; i <= order; ++i) {
-			for (j = 0, py = 1.0, t = 0.0, m = order - i; j <= m; ++j, ++k) {
-				t += coef[k] * py;
-				py *= y;
-			}
-
-			val += t * px;
-			px *= x;
-		}
-
-		return val;
-	}
-
-	void project_correct(double &x, double &y) {
-		double dx(0.0), dy(0.0);
-		dx = poly_val(x, y, A, orderA);
-		dy = poly_val(x, y, B, orderB);
-		x += dx;
-		y += dy;
-	}
-
-public:
-	bool load_wcs(const string &filepath) {
-		fitsfile *fitsptr;	//< 基于cfitsio接口的文件操作接口
-		char key[10];
-		int status(0), ncoef, i, j, k, m;
-
-		fits_open_file(&fitsptr, filepath.c_str(), 0, &status);
-		fits_read_key(fitsptr, TDOUBLE, "CRPIX1", &x0, NULL, &status);
-		fits_read_key(fitsptr, TDOUBLE, "CRPIX2", &y0, NULL, &status);
-		fits_read_key(fitsptr, TDOUBLE, "CRVAL1", &r0, NULL, &status);
-		fits_read_key(fitsptr, TDOUBLE, "CRVAL2", &d0, NULL, &status);
-		fits_read_key(fitsptr, TDOUBLE, "CD1_1", &cd[0][0], NULL, &status);
-		fits_read_key(fitsptr, TDOUBLE, "CD1_2", &cd[0][1], NULL, &status);
-		fits_read_key(fitsptr, TDOUBLE, "CD2_1", &cd[1][0], NULL, &status);
-		fits_read_key(fitsptr, TDOUBLE, "CD2_2", &cd[1][1], NULL, &status);
-
-		fits_read_key(fitsptr, TINT, "A_ORDER", &orderA, NULL, &status);
-		if (status)
-			return false;
-		ncoef = term_count(orderA);
-		alloc_coef(ncoef, &A);
-		for (i = 0, k = 0; i <= orderA; ++i) {
-			for (j = 0, m = orderA - i; j <= m; ++j, ++k) {
-				sprintf(key, "A_%d_%d", i, j);
-				fits_read_key(fitsptr, TDOUBLE, key, A + k, NULL, &status);
-			}
-		}
-
-		fits_read_key(fitsptr, TINT, "B_ORDER", &orderB, NULL, &status);
-		if (status)
-			return false;
-		ncoef = term_count(orderB);
-		alloc_coef(ncoef, &B);
-		for (i = 0, k = 0; i <= orderB; ++i) {
-			for (j = 0, m = orderB - i; j <= m; ++j, ++k) {
-				sprintf(key, "B_%d_%d", i, j);
-				fits_read_key(fitsptr, TDOUBLE, key, B + k, NULL, &status);
-			}
-		}
-
-		fits_close_file(fitsptr, &status);
-
-		r0 *= D2R;
-		d0 *= D2R;
-		return !status;
-	}
-
-	void image_to_wcs(double x, double y, double &ra, double &dec) {
-		double xi, eta;
-		x -= x0;
-		y -= y0;
-		project_correct(x, y);
-		xi = (cd[0][0] * x + cd[0][1] * y) * D2R;
-		eta = (cd[1][0] * x + cd[1][1] * y) * D2R;
-		plane_to_wcs(xi, eta, ra, dec);
-		ra *= R2D;
-		dec *= R2D;
+	ObjectInfo() {
+		memset(this, 0, sizeof(ObjectInfo));
+		mag_cat = 20;
+		mag_cat = 20;
 	}
 };
+typedef boost::shared_ptr<ObjectInfo> NFObjPtr;
+typedef std::vector<NFObjPtr> NFObjVec;
 
 /*!
  * @struct OneFrame 单帧图像的特征信息
@@ -218,26 +88,50 @@ struct OneFrame {
 	string filename;	//< 文件名
 	string tmobs;		//< 曝光起始时间, UTC. CCYY-MM-DDThh:mm:ss.ssssss
 	string tmmid;		//< 曝光中间时间, UTC. CCYY-MM-DDThh:mm:ss.ssssss
-	double exptime;		//< 曝光时间, 量纲: 秒
+	string imgtype;		//< 图像类型
 	int wimg;			//< 图像宽度
 	int himg;			//< 图像高度
+	int fno;			//< 帧编号
+	double expdur;		//< 曝光时间, 量纲: 秒
+	double secofday;	//< 当日秒数
+	double mjd;			//< 修正儒略日: 曝光中间时刻
 	/* 网络标志 */
 	string gid;		//< 组标志
 	string uid;		//< 单元ID
 	string cid;		//< 相机ID
 	/* 处理结果 */
-	wcsinfo wcs[4];		//< 全图分为均等分为4个区域
-	BodyVector bodies;	//< 处理结果
+	double fwhm;		//< 中心区域统计FWHM, 量纲: 像素
+	double rac, decc;	//< 中心视场指向, 量纲: 角度
+	double azic, altc;	//< 中心视场指向, 量纲: 角度
+	double airmass;		//< 大气质量: 中心指向
+	int lastid;			//< 感兴趣目标的最后一个编号
+	NFObjVec nfobjs;	//< 集合: 目标特征
+	/*
+	 * 仪器星等改正及大气消光
+	 * @ -mag0参与拟合消光系数, 每天依据大气质量分布范围判定是否输出晓光系数
+	 */
+	double mag0;	//< 星等零点. 仪器星等0时对应的视星等
+	double magk;	//< 拟合系数. magV=kmag*magInst+mag0
 
 public:
 	OneFrame() {
 		result = SUCCESS_INIT;
-		exptime = 0.0;
 		wimg = himg = 0;
+		fno  = 0;
+		secofday = 0;
+		mjd  = 0;
+		expdur = 0.0;
+		fwhm = 0.0;
+		rac  = decc = 0.0;
+		azic = altc = 0.0;
+		airmass  = 0.0;
+		lastid   = 0;
+		mag0     = 0.0;
+		magk     = 0.0;
 	}
 
 	virtual ~OneFrame() {
-		bodies.clear();
+		nfobjs.clear();
 	}
 };
 typedef boost::shared_ptr<OneFrame> FramePtr;	//< 单帧图像特征信息访问指针

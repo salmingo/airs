@@ -11,6 +11,7 @@
 
 #include <boost/signals2.hpp>
 #include <boost/thread.hpp>
+#include <unistd.h>
 #include "airsdata.h"
 #include "Parameter.h"
 
@@ -21,7 +22,7 @@ public:
 
 public:
 	/* 数据类型 */
-	typedef boost::signals2::signal<void (bool, const long, double)> ReductResult;	//< 图像处理结果回调函数
+	typedef boost::signals2::signal<void (bool)> ReductResult;	//< 图像处理结果回调函数
 	typedef ReductResult::slot_type ReductResultSlot;			//< 图像处理结果回调函数插槽
 	typedef boost::shared_ptr<boost::thread> threadptr;			//< 线程指针
 
@@ -33,7 +34,7 @@ protected:
 	FramePtr frame_;	//< 待处理图像文件信息
 	string filemntr_;	//< 建立多进程监测对象, 对象类型: 数据处理结果文件
 	threadptr thrd_mntr_;	//< 线程: 监测处理结果
-	double fwhm_;		//< 中心区域统计FWHM
+	pid_t pid_;			//< 进程ID
 
 public:
 	/*!
@@ -52,20 +53,22 @@ public:
 	 * 图像处理流程启动结果
 	 */
 	bool DoIt(FramePtr frame);
+	/*!
+	 * @brief 查看当前处理图像
+	 */
+	FramePtr GetFrame();
 
 protected:
-	/*!
-	 * @brief 检查并读取FITS文件的基本信息
-	 */
-	bool check_image();
 	/*!
 	 * @brief 创建监测点
 	 */
 	void create_monitor();
 	/*!
 	 * @brief 将处理结果导入内存
+	 * @return
+	 * 中心区域统计FWHM. <= 0: 无统计结果
 	 */
-	bool load_catalog();
+	void load_catalog();
 	/*!
 	 * @brief 线程: 监测处理结果
 	 */

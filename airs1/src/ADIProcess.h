@@ -7,8 +7,9 @@
 #ifndef ADIPROCESS_H_
 #define ADIPROCESS_H_
 
-#include "ADIData.h"
 #include "Parameter.h"
+#include "ADIData.h"
+#include "ADIReduct.h"
 
 namespace AstroUtil {
 //////////////////////////////////////////////////////////////////////////////
@@ -19,14 +20,10 @@ public:
 
 protected:
 	Parameter *param_;	//< 参数
-	int nmaxthread_;	//< 最大线程数
-	vector<float> dataimg_;	//< 缓存区: 原始图像数据
-	vector<float> databuf_;	//< 缓存区: 图像数据备份
-	vector<float> databk_;	//< 缓存区: 背景
-	vector<float> datarms_;	//< 缓存区: 噪声
-	vector<float> bkmesh_;	//< 缓存区: 背景网格
-	vector<float> bkrms_;	//< 缓存区: 网格噪声
-	ImgFrmPtr frmptr_;		//< 存储区: 图像处理结果
+	ImgFrmPtr frmptr_;	//< 存储区: 图像处理结果
+
+	/* 数据处理接口 */
+	ADIReductPtr reduct_;	//< 图像处理接口
 
 public:
 	/*!
@@ -42,12 +39,6 @@ public:
 	bool DoIt();
 
 protected:
-	/*!
-	 * @brief 尝试打开文件并载入数据
-	 * @return
-	 * 文件访问结果
-	 */
-	bool open_file();
 };
 //////////////////////////////////////////////////////////////////////////////
 }

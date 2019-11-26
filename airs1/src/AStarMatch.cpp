@@ -1,0 +1,19 @@
+/**
+ * @class AStarMatch 拟合建立星图与图像坐标的对应关系
+ * @version 0.1
+ * @date 2019-11-12
+ */
+
+#include "AStarMatch.h"
+
+namespace AstroUtil {
+//////////////////////////////////////////////////////////////////////////////
+AStarMatch::AStarMatch() {
+
+}
+
+AStarMatch::~AStarMatch() {
+
+}
+//////////////////////////////////////////////////////////////////////////////
+} /* namespace AstroUtil */

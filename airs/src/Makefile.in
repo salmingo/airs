@@ -90,6 +90,8 @@ build_triplet = @build@
 host_triplet = @host@
 target_triplet = @target@
 bin_PROGRAMS = airs$(EXEEXT)
+@LINUX_TRUE@am__append_1 = -lboost_thread -lrt
+@OSX_TRUE@am__append_2 = -lboost_thread-mt
 subdir = src
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/configure.ac
@@ -104,11 +106,14 @@ PROGRAMS = $(bin_PROGRAMS)
 am_airs_OBJECTS = daemon.$(OBJEXT) GLog.$(OBJEXT) AstroDIP.$(OBJEXT) \
 	AstroMetry.$(OBJEXT) PhotoMetry.$(OBJEXT) \
 	IOServiceKeep.$(OBJEXT) MessageQueue.$(OBJEXT) \
-	tcpasio.$(OBJEXT) WataDataTransfer.$(OBJEXT) \
-	AsciiProtocol.$(OBJEXT) DoProcess.$(OBJEXT) airs.$(OBJEXT)
+	tcpasio.$(OBJEXT) DBCurl.$(OBJEXT) AMath.$(OBJEXT) \
+	ATimeSpace.$(OBJEXT) ACatalog.$(OBJEXT) ACatUCAC4.$(OBJEXT) \
+	AsciiProtocol.$(OBJEXT) LogCalibrated.$(OBJEXT) \
+	DoProcess.$(OBJEXT) AFindPV.$(OBJEXT) airs.$(OBJEXT)
 airs_OBJECTS = $(am_airs_OBJECTS)
 am__DEPENDENCIES_1 =
-airs_DEPENDENCIES = $(am__DEPENDENCIES_1)
+airs_DEPENDENCIES = $(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1)
 airs_LINK = $(CXXLD) $(AM_CXXFLAGS) $(CXXFLAGS) $(airs_LDFLAGS) \
 	$(LDFLAGS) -o $@
 AM_V_P = $(am__v_P_@AM_V@)
@@ -126,13 +131,15 @@ am__v_at_1 =
 DEFAULT_INCLUDES = -I.@am__isrc@
 depcomp = $(SHELL) $(top_srcdir)/depcomp
 am__maybe_remake_depfiles = depfiles
-am__depfiles_remade = ./$(DEPDIR)/AsciiProtocol.Po \
+am__depfiles_remade = ./$(DEPDIR)/ACatUCAC4.Po ./$(DEPDIR)/ACatalog.Po \
+	./$(DEPDIR)/AFindPV.Po ./$(DEPDIR)/AMath.Po \
+	./$(DEPDIR)/ATimeSpace.Po ./$(DEPDIR)/AsciiProtocol.Po \
 	./$(DEPDIR)/AstroDIP.Po ./$(DEPDIR)/AstroMetry.Po \
-	./$(DEPDIR)/DoProcess.Po ./$(DEPDIR)/GLog.Po \
-	./$(DEPDIR)/IOServiceKeep.Po ./$(DEPDIR)/MessageQueue.Po \
-	./$(DEPDIR)/PhotoMetry.Po ./$(DEPDIR)/WataDataTransfer.Po \
-	./$(DEPDIR)/airs.Po ./$(DEPDIR)/daemon.Po \
-	./$(DEPDIR)/tcpasio.Po
+	./$(DEPDIR)/DBCurl.Po ./$(DEPDIR)/DoProcess.Po \
+	./$(DEPDIR)/GLog.Po ./$(DEPDIR)/IOServiceKeep.Po \
+	./$(DEPDIR)/LogCalibrated.Po ./$(DEPDIR)/MessageQueue.Po \
+	./$(DEPDIR)/PhotoMetry.Po ./$(DEPDIR)/airs.Po \
+	./$(DEPDIR)/daemon.Po ./$(DEPDIR)/tcpasio.Po
 am__mv = mv -f
 CXXCOMPILE = $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) \
 	$(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS)
@@ -279,12 +286,18 @@ top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 airs_SOURCES = daemon.cpp GLog.cpp AstroDIP.cpp AstroMetry.cpp PhotoMetry.cpp \
-             IOServiceKeep.cpp MessageQueue.cpp tcpasio.cpp WataDataTransfer.cpp \
-             AsciiProtocol.cpp DoProcess.cpp airs.cpp
+             IOServiceKeep.cpp MessageQueue.cpp tcpasio.cpp DBCurl.cpp \
+             AMath.cpp ATimeSpace.cpp ACatalog.cpp ACatUCAC4.cpp \
+             AsciiProtocol.cpp LogCalibrated.cpp DoProcess.cpp AFindPV.cpp airs.cpp
 
+@DEBUG_FALSE@AM_CFLAGS = -O3 -Wall
+@DEBUG_TRUE@AM_CFLAGS = -g3 -O0 -Wall -DNDEBUG
+@DEBUG_FALSE@AM_CXXFLAGS = -O3 -Wall
+@DEBUG_TRUE@AM_CXXFLAGS = -g3 -O0 -Wall -DNDEBUG
 airs_LDFLAGS = -L/usr/local/lib
-BOOST_LIBS = -lboost_system -lboost_date_time -lboost_thread-mt -lboost_filesystem -lboost_chrono
-airs_LDADD = ${BOOST_LIBS} -lm -lpthread -lcurl -lcfitsio 
+BOOST_LIBS = -lboost_system -lboost_date_time -lboost_filesystem -lboost_chrono
+airs_LDADD = ${BOOST_LIBS} -lm -lpthread -lcurl -lcfitsio \
+	$(am__append_1) $(am__append_2)
 all: all-am
 
 .SUFFIXES:
@@ -371,15 +384,21 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ACatUCAC4.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ACatalog.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/AFindPV.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/AMath.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ATimeSpace.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/AsciiProtocol.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/AstroDIP.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/AstroMetry.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/DBCurl.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/DoProcess.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/GLog.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/IOServiceKeep.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/LogCalibrated.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/MessageQueue.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/PhotoMetry.Po@am__quote@ # am--include-marker
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/WataDataTransfer.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/airs.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/daemon.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/tcpasio.Po@am__quote@ # am--include-marker
@@ -531,15 +550,21 @@ clean: clean-am
 clean-am: clean-binPROGRAMS clean-generic mostlyclean-am
 
 distclean: distclean-am
-		-rm -f ./$(DEPDIR)/AsciiProtocol.Po
+		-rm -f ./$(DEPDIR)/ACatUCAC4.Po
+	-rm -f ./$(DEPDIR)/ACatalog.Po
+	-rm -f ./$(DEPDIR)/AFindPV.Po
+	-rm -f ./$(DEPDIR)/AMath.Po
+	-rm -f ./$(DEPDIR)/ATimeSpace.Po
+	-rm -f ./$(DEPDIR)/AsciiProtocol.Po
 	-rm -f ./$(DEPDIR)/AstroDIP.Po
 	-rm -f ./$(DEPDIR)/AstroMetry.Po
+	-rm -f ./$(DEPDIR)/DBCurl.Po
 	-rm -f ./$(DEPDIR)/DoProcess.Po
 	-rm -f ./$(DEPDIR)/GLog.Po
 	-rm -f ./$(DEPDIR)/IOServiceKeep.Po
+	-rm -f ./$(DEPDIR)/LogCalibrated.Po
 	-rm -f ./$(DEPDIR)/MessageQueue.Po
 	-rm -f ./$(DEPDIR)/PhotoMetry.Po
-	-rm -f ./$(DEPDIR)/WataDataTransfer.Po
 	-rm -f ./$(DEPDIR)/airs.Po
 	-rm -f ./$(DEPDIR)/daemon.Po
 	-rm -f ./$(DEPDIR)/tcpasio.Po
@@ -588,15 +613,21 @@ install-ps-am:
 installcheck-am:
 
 maintainer-clean: maintainer-clean-am
-		-rm -f ./$(DEPDIR)/AsciiProtocol.Po
+		-rm -f ./$(DEPDIR)/ACatUCAC4.Po
+	-rm -f ./$(DEPDIR)/ACatalog.Po
+	-rm -f ./$(DEPDIR)/AFindPV.Po
+	-rm -f ./$(DEPDIR)/AMath.Po
+	-rm -f ./$(DEPDIR)/ATimeSpace.Po
+	-rm -f ./$(DEPDIR)/AsciiProtocol.Po
 	-rm -f ./$(DEPDIR)/AstroDIP.Po
 	-rm -f ./$(DEPDIR)/AstroMetry.Po
+	-rm -f ./$(DEPDIR)/DBCurl.Po
 	-rm -f ./$(DEPDIR)/DoProcess.Po
 	-rm -f ./$(DEPDIR)/GLog.Po
 	-rm -f ./$(DEPDIR)/IOServiceKeep.Po
+	-rm -f ./$(DEPDIR)/LogCalibrated.Po
 	-rm -f ./$(DEPDIR)/MessageQueue.Po
 	-rm -f ./$(DEPDIR)/PhotoMetry.Po
-	-rm -f ./$(DEPDIR)/WataDataTransfer.Po
 	-rm -f ./$(DEPDIR)/airs.Po
 	-rm -f ./$(DEPDIR)/daemon.Po
 	-rm -f ./$(DEPDIR)/tcpasio.Po
@@ -635,8 +666,6 @@ uninstall-am: uninstall-binPROGRAMS
 
 .PRECIOUS: Makefile
 
-#BOOST_LIBS = -lboost_system -lboost_date_time -lboost_thread -lboost_filesystem -lboost_chrono
-#airs_LDADD = ${BOOST_LIBS} -lm -lpthread -lcurl -lcfitsio -lrt
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.

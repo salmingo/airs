@@ -1,13 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <version>0.1</version>
-<date>2019-10-21T04:45:08</date>
+<date>2019-11-03T07:08:16</date>
+<Output Path=""/>
 <Preprocess Enable="false">
     <ZERO Path=""/>
     <DARK Path=""/>
     <FLAT Path=""/>
 </Preprocess>
 <ImageReduct>
-    <BackMesh Size="64"/>
+    <BackMesh Size="128"/>
     <!--<size> or <width>, <height>-->
     <BackFilter Size="3"/>
     <!--<size> or <width>, <height>-->
@@ -18,5 +19,4 @@
     <Filter Enable="false" Filepath=""/>
     <!--use filter to detect signal-->
     <CleanSpurious Enable="true"/>
-    <Result Enable="false" Subpath=""/>
 </ImageReduct>

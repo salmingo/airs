@@ -24,9 +24,11 @@
 #include "AstroMetry.h"
 #include "PhotoMetry.h"
 #include "tcpasio.h"
-#include "WataDataTransfer.h"
+#include "DBCurl.h"
 #include "airsdata.h"
 #include "AsciiProtocol.h"
+#include "LogCalibrated.h"
+#include "AFindPV.h"
 
 class DoProcess : public MessageQueue {
 public:
@@ -35,21 +37,17 @@ public:
 
 protected:
 	/* 数据类型 */
-	typedef std::deque<string> strque;
 	typedef boost::shared_ptr<AstroDIP> AstroDIPtr;
 	typedef boost::shared_ptr<AstroMetry> AstroMetryPtr;
 	typedef boost::shared_ptr<PhotoMetry> PhotoMetryPtr;
+	typedef boost::shared_ptr<AFindPV> FindPVPtr;
 
 	enum {// 声明消息字
-		MSG_NEW_IMAGE = MSG_USER,	//< 有新的图像数据等待处理
-		MSG_NEW_ASTROMETRY,		//< 启动天文定位流程
-		MSG_NEW_PHOTOMETRY,		//< 启动流程定标流程
-		MSG_COMPLETE_PROCESS,	//< 完成图像处理/定位/定标流程
-		MSG_CONNECT_GC,			//< 与总控服务器连接结果
-		MSG_CLOSE_GC,			//< 与总控服务器断开连接
-		MSG_CONNECT_FILESERVER,	//< 与文件服务器连接结果
-		MSG_RECEIVE_FILESERVER,	//< 收到文件服务器消息
-		MSG_CLOSE_FILESERVER,	//< 与文件服务器断开连接
+		MSG_CONNECT_GC = MSG_USER,	//< 与总控服务器连接结果
+		MSG_CLOSE_GC,				//< 与总控服务器断开连接
+		MSG_CONNECT_FILESERVER,		//< 与文件服务器连接结果
+		MSG_RECEIVE_FILESERVER,		//< 收到文件服务器消息
+		MSG_CLOSE_FILESERVER,		//< 与文件服务器断开连接
 		MSG_LAST
 	};
 
@@ -58,20 +56,31 @@ protected:
 	boost::asio::io_service *ios_;	//< io_service对象. 从内部结束程序
 	bool asdaemon_;		//< 以守护服务模式运行程序
 	Parameter param_;	//< 参数
+	boost::shared_ptr<LogCalibrated> logcal_; //< 日志: 定标结果_
 
-	boost::mutex mtx_frame_;	//< 互斥锁: 图像处理队列
-	FrameQueue allframe_;	//< 图像处理队列
-	AstroDIPtr   astrodip_;
-	AstroMetryPtr astrometry_;
-	PhotoMetryPtr photometry_;
+	/* 数据处理 */
+	boost::mutex mtx_frm_reduct_;	//< 互斥锁: 图像处理
+	boost::mutex mtx_frm_astro_;	//< 互斥锁: 天文定位
+	boost::mutex mtx_frm_photo_;	//< 互斥锁: 测光
+	FrameQueue queReduct_;		//< 队列: 图像处理
+	FrameQueue queAstro_;		//< 队列: 天文定位
+	FrameQueue quePhoto_;		//< 队列: 测光
+	AstroDIPtr    reduct_;		//< 接口: 图像处理
+	AstroMetryPtr astro_;		//< 接口: 天文定位
+	PhotoMetryPtr photo_;		//< 接口: 测光
+	FindPVPtr finder_;			//< 接口: 运动目标关联
+	threadptr thrd_reduct_;		//< 线程: 图像处理
+	threadptr thrd_astro_;		//< 线程: 天文定位
+	threadptr thrd_photo_;		//< 线程: 测光
+	boost::condition_variable cv_reduct_;	//< 条件: 图像处理
+	boost::condition_variable cv_astro_;	//< 条件: 天文定位
+	boost::condition_variable cv_photo_;	//< 条件: 测光
+
+	/* 网络通信 */
 	TcpCPtr tcpc_gc_;	//< 网络连接: 总控服务器
 	TcpCPtr tcpc_fs_;	//< 网络连接: 文件服务器
 	AscProtoPtr ascproto_;	//< ASCII协议接口
 	boost::shared_array<char> bufrcv_;	//< 数据接收缓存区
-	boost::shared_ptr<WataDataTransfer> db_; //< 数据库访问接口
-	boost::condition_variable cv_complete_;	//< 条件变量: 完成数据处理
-
-	threadptr thrd_complete_;	//< 线程: 完成数据处理
 	threadptr thrd_reconn_gc_;	//< 线程: 重连总控服务器
 	threadptr thrd_reconn_fileserver_;	//< 线程: 重连文件服务器
 
@@ -96,28 +105,44 @@ public:
 	/*!
 	 * @brief 图像处理结果回调函数
 	 * @param rslt 图像处理结果. true: 成功; false: 失败
-	 * @param addr 处理结果访问地址, 数据类型: OneFrame*
-	 * @param fwhm 视场中心区域统计FWHM, 量纲: 像素
 	 */
-	void ImageReductResult(bool rslt, const long addr, double fwhm);
+	void ImageReductResult(bool rslt);
 	/*!
 	 * @brief 天文定位结果回调函数
-	 * @param rslt 天文定位结果. true: 成功; false: 失败
-	 * @param addr 处理结果访问地址, 数据类型: OneFrame*
+	 * @param rslt 天文定位结果. 0: 失败; 1: 视场中心定位成功; 2: 目标中心定位成功
 	 */
-	void AstrometryResult(bool rslt, const long addr);
+	void AstrometryResult(int rslt);
 	/*!
 	 * @brief 流量定标结果回调函数
 	 * @param rslt 流量定标结果. true: 成功; false: 失败
-	 * @param addr 处理结果访问地址, 数据类型: OneFrame*
 	 */
-	void PhotometryResult(bool rslt, const long addr);
+	void PhotometryResult(bool rslt);
 
 protected:
+	/* 数据处理 */
 	/*!
 	 * @breif 创建AstroDIP/AstroMetry/PhotoMetry对象
 	 */
 	void create_objects();
+	/*!
+	 * @brief 检查并读取FITS文件的基本信息
+	 */
+	bool check_image(FramePtr frame);
+	/*!
+	 * @brief 线程: 图像处理
+	 */
+	void thread_reduct();
+	/*!
+	 * @brief 线程: 天文定位
+	 */
+	void thread_astro();
+	/*!
+	 * @brief 线程: 测光
+	 */
+	void thread_photo();
+
+protected:
+	/* 网络通信 */
 	/*!
 	 * @brief 连接总控服务器
 	 */
@@ -143,10 +168,6 @@ protected:
 	 */
 	void received_server_fileserver(const long addr, const long ec);
 	/*!
-	 * @brief 线程: 已完成处理流程数据的后续处理
-	 */
-	void thread_complete();
-	/*!
 	 * @brief 线程: 重连总控服务器
 	 */
 	void thread_reconnect_gc();
@@ -161,31 +182,6 @@ protected:
 	 * @brief 注册消息响应函数
 	 */
 	void register_messages();
-	/*!
-	 * @brief 响应消息MSG_NEW_IMAGE
-	 */
-	void on_new_image(const long, const long);
-	/*!
-	 * @brief 响应消息MSG_NEW_ASTROMETRY
-	 */
-	void on_new_astrometry(const long addr, const long);
-	/*!
-	 * @brief 响应消息MSG_NEW_PHOTOMETRY
-	 */
-	void on_new_photometry(const long addr, const long);
-	/*!
-	 * @brief 响应消息MSG_COMPLETE_PROCESS
-	 * @param rslt
-	 *  0: 完成完整处理流程
-	 *  1: 完成图像处理
-	 *  2: 完成天文定位
-	 *  3: 完成流量定标
-	 * -1: 图像处理流程失败
-	 * -2: 天文流程失败
-	 * -3: 流量定标流程失败
-	 * @param addr
-	 */
-	void on_complete_process(const long rslt, const long addr);
 	/*!
 	 * @brief 响应消息MSG_CONNECT_GC, 处理与总控服务器的连接结果
 	 */

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<version>0.1</version>
+<date>20191101T025045</date>
+<GeoSite Name="HN">
+    <Location Lon="111.714" Lat="16.450800000000001" Alt="10" Timezone="8"/>
+</GeoSite>
+<Output Path="/Users/lxm/Data"/>
+<Work Path="/Users/lxm/Data/Temp"/>
+<SampleWindow Size="512"/>
+<Reduction PathExe="/usr/local/bin/sex" PathConfig="/usr/local/etc/sex-param/default.sex"/>
+<Astrometry Enable="true" PathExe="/usr/local/bin/solve-field">
+    <PixelScale Low="8.3" High="8.5"/>
+</Astrometry>
+<Photometry Enable="true">
+    <Catalog Path="/Users/lxm/Catalogue/UCAC4"/>
+</Photometry>
+<Database Enable="false">
+    <URL Addr="http://172.28.8.8:8080/gwebend/"/>
+</Database>
+<GeneralControl Enable="false">
+    <Host IPv4="127.0.0.1" Port="4020"/>
+</GeneralControl>
+<FileServer Enable="false">
+    <Host IPv4="127.0.0.1" Port="4021"/>
+</FileServer>

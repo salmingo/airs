@@ -22,24 +22,22 @@ public:
 
 	/* 成员变量 */
 public:
+	string patho;	//< 处理结果输出路径
 	/* 预处理 */
-	bool doPreproc;	//< 是否启用预处理
-	string pathZERO;	//< 文件路径: 合并后本底
-	string pathDARK;	//< 文件路径: 合并后暗场
-	string pathFLAT;	//< 文件路径: 合并后平场
+	bool dopre;		//< 是否启用预处理
+	string pathz;	//< 文件路径: 合并后本底
+	string pathd;	//< 文件路径: 合并后暗场
+	string pathf;	//< 文件路径: 合并后平场
 
 	/* 图像处理 */
-	int backWidth, backHeight;	//< 背景拟合网格大小
-	int backFilterWidth, backFilterHeight;	//< 背景滤波网格数量
-	double snrDetect;	//< 信噪比: 单像素提取
-	double snrAnalysis;	//< 信噪比: 目标识别
-	int areaMin, areaMax;	//< 构成目标的像素数阈值
-	bool useFilterDetect;		//< 启用: 在信号提取前滤波
-	string pathFilterDetect;	//< 信号提取滤波函数卷积核存储路径
-	bool useCleanSpurious;		//< 启用: 剔除假信号
-
-	bool useResultFile;			//< 启用: 输出处理结果到文件中
-	string subpathResult;		//< 结果文件目录名
+	int bkw, bkh;		//< 背景拟合网格大小
+	int bkfw, bkfh;		//< 背景滤波网格数量
+	double snrp;		//< 信噪比: 单像素提取
+	double snro;		//< 信噪比: 目标识别
+	int area0, area1;	//< 构成目标的像素数阈值
+	bool ufo;			//< 启用: 在信号提取前滤波
+	string pathfo;		//< 信号提取滤波函数卷积核存储路径
+	bool ucs;			//< 启用: 剔除假信号
 
 	/* 天文定位 */
 
