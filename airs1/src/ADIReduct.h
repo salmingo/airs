@@ -43,12 +43,10 @@ protected:
 	int nbkh_;			//< 高度方向网格数量
 	int nbk_;			//< 网格数量
 	fltarr databuf_;	//< 缓存区: 图像数据备份
-	fltarr databk_;		//< 缓存区: 背景
-	fltarr datarms_;	//< 缓存区: 噪声
 	fltarr bkmean_;		//< 缓存区: 背景网格
 	fltarr bksig_;		//< 缓存区: 网格噪声
-	dblarr dx2mean_;	//< 缓存区: 背景网格, X方向快速变化样条插值系数矩阵
-	dblarr dx2sig_;		//< 缓存区: 网格噪声, X方向快速变化样条插值系数矩阵
+	dblarr d2mean_;		//< 缓存区: 背景网格二元三次样条二阶扰动矩, Y方向快速变化样条插值系数矩阵
+	dblarr d2sig_;		//< 缓存区: 网格噪声二元三次样条二阶扰动矩, Y方向快速变化样条插值系数矩阵
 
 public:
 	/*!
@@ -61,6 +59,11 @@ protected:
 	 * @brief 使用快速排序算法计算数组中值
 	 */
 	float qmedian(float *x, int n);
+	/**
+	 * @brief image_xxxx 对一维/二维图像数组封装三次样条插值
+	 * @note
+	 * 图像数组的特征是: 索引位置严格递增排序, 步长==1
+	 */
 	/*!
 	 * @brief 采用三次样条插值, 生成二阶导数矢量
 	 * @param n      参与拟合的样本数量
@@ -69,7 +72,7 @@ protected:
 	 * @param ypn     >=AMAX时, 结束点单边一阶导数为0
 	 * @param c      拟合结果, 1*n数组
 	 */
-	void bkspline(int n, float *y, double yp1, double ypn, double *c);
+	void image_spline(int n, float *y, double yp1, double ypn, double *c);
 	/*!
 	 * @brief 三次样条插值
 	 * @param n     样本数量
@@ -79,29 +82,39 @@ protected:
 	 * @return
 	 * 插值结果. 错误时返回1
 	 */
-	float bksplint(int n, float *y, double *c, double xo);
+	float image_splint(int n, float *y, double *c, double xo);
 	/*!
 	 * @brief 计算二元三次样条内插系数
 	 * @param m   慢速自变量长度
 	 * @param n   快速自变量长度
-	 * @param y   样本: 因变量数组,  m*n数组
-	 * @param c   内插系数拟合结果
+	 * @param y   样本: 因变量数组, m*n数组
+	 * @param c   内插系数拟合结果, n*m数组, 列优先存储
 	 * @note
-	 * 对于二维图形, x对应X轴, 即数组y按照行优先排序
+	 * 生成n*m二阶扰动矩阵, 对应图像中Y方向优先存储
 	 */
-	void bkspline2(int m, int n, float y[], double c[]);
+	void image_spline2(int m, int n, float y[], double c[]);
 	/*!
 	 * @brief 使用二元三次样条插值
 	 * @param m    慢速自变量数组长度
 	 * @param n    快速自变量数组长度
 	 * @param y    样本: 因变量数组, m*n数组
-	 * @param c    内插系数拟合结果
-	 * @param x1o
-	 * @param x2o
+	 * @param c    内插系数拟合结果, n*m数组, 列优先存储
+	 * @param x1o  慢速自变量位置, 对应图像中Y轴
+	 * @param x2o  快速自变量位置, 对应图像中X轴
 	 * @return
 	 * 插值结果
 	 */
-	float bksplint2(int m, int n, float y[], double c[], double x1o, double x2o);
+	float image_splint2(int m, int n, float y[], double c[], double x1o, double x2o);
+	/*!
+	 * @brief 使用二元三次样条插值, 计算图像各行的插值
+	 * @param m     慢速自变量数组长度
+	 * @param n     快速自变量数组长度
+	 * @param y     样本: 因变量数组, m*n数组, 指向bkmean_或bksig_
+	 * @param c     内插系数拟合结果, n*m数组, 列优先存储, 指向d2mean_或d2sig_
+	 * @param line  行编号, 对应图像中Y轴
+	 * @param yx    行line中各x位置的拟合值, 1*n数组
+	 */
+	void line_splint2(int m, int n, float y[], double c[], double line, float yx[]);
 
 protected:
 	/*!

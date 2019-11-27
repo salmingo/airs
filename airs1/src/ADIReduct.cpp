@@ -5,13 +5,18 @@
  */
 
 #include <cstdlib>
+#include <cstdio>
 #include <string.h>
 #include <boost/make_shared.hpp>
+#include <boost/date_time/posix_time/posix_time.hpp>
+#include <longnam.h>
+#include <fitsio.h>
 #include "ADIReduct.h"
 #include "ADefine.h"
 
 using namespace std;
 using namespace boost;
+using namespace boost::posix_time;
 
 namespace AstroUtil {
 ADIReductPtr make_reduct(Parameter *param) {
@@ -38,8 +43,20 @@ ADIReduct::~ADIReduct() {
 bool ADIReduct::DoIt(ImgFrmPtr frame) {
 	frame_ = frame;
 	alloc_buffer();
+#ifdef NDEBUG
+	ptime now = microsec_clock::universal_time();
+	ptime::time_duration_type tdt;
+#endif
 	back_make();
+#ifdef NDEBUG
+	tdt = microsec_clock::universal_time() - now;
+	printf ("back_make() ellapsed: %lld microsec\n", tdt.total_microseconds());
+#endif
 	sub_back();
+#ifdef NDEBUG
+	tdt = microsec_clock::universal_time() - now;
+	printf ("sub_back() ellapsed: %lld microsec\n", tdt.total_microseconds());
+#endif
 	// 信号滤波: 用于信号提取
 	// 信号提取与聚合
 	// 目标提取与计算
@@ -58,7 +75,7 @@ float ADIReduct::qmedian(float *x, int n) {
 	return (n & 1 ? x[n / 2] : (x[n / 2 - 1] + x[n / 2]) * 0.5);
 }
 
-void ADIReduct::bkspline(int n, float *y, double yp1, double ypn, double *c) {
+void ADIReduct::image_spline(int n, float *y, double yp1, double ypn, double *c) {
 	double *u = new double[n];
 	double qn, un, p;
 	int i, nm1(n - 1), nm2(n - 2);
@@ -89,12 +106,12 @@ void ADIReduct::bkspline(int n, float *y, double yp1, double ypn, double *c) {
 	delete []u;
 }
 
-float ADIReduct::bksplint(int n, float *y, double *c, double xo) {
+float ADIReduct::image_splint(int n, float *y, double *c, double xo) {
 	int nx = int(xo);
 	int low, high;
 	double a, b, yo;
 
-	low  = nx < 0 ? 0 : (nx == n - 1 ? n - 2 : nx);
+	low  = xo <= 0.0 ? 0 : (nx == n - 1 ? n - 2 : nx);
 	high = low + 1;
 	a = high - xo;
 	b = 1.0 - a;
@@ -102,40 +119,52 @@ float ADIReduct::bksplint(int n, float *y, double *c, double xo) {
 	return float(yo);
 }
 
-void ADIReduct::bkspline2(int m, int n, float y[], double c[]) {
-	float *yptr = y;
-	double *cptr = c;
+/*!
+ * @brief 生成列列优先存储的二阶扰动矩
+ * @note
+ * - y: 原始数据数组, 长度==m*n, 对应bkmean_或bksig_
+ * - c: 二阶扰动矩, 长度==n*m
+ */
+void ADIReduct::image_spline2(int m, int n, float y[], double c[]) {
+	double *cptr = c;	// n*m
+	float *ytmp  = new float[m];
+	int i, j, k;
 
-	for (int j = 0; j < m; ++j, yptr += n, cptr += n) {
-		bkspline(n, yptr, 1E30, 1E30, cptr);
+	for (i = 0; i < n; ++i, cptr += m) {
+		for (j = 0, k = i; j < m; ++j, k += n) ytmp[j] = y[k];
+		image_spline(m, ytmp, 1E30, 1E30, cptr);
 	}
+	delete []ytmp;
 }
 
-float ADIReduct::bksplint2(int m, int n, float y[], double c[], double x1o, double x2o) {
-	float *yx1 = new float[m];
-	float *yptr = y;
-	double *cptr = c;
-	double *cx1 = new double[m];
-	double yo;
-	int j;
+float ADIReduct::image_splint2(int m, int n, float y[], double c[], double x1o, double x2o) {
+//	float *yx1 = new float[m];
+//	float *yptr = y;
+//	double *cptr = c;
+//	double *cx1 = new double[m];
+//	double yo;
+//	int j;
+//
+//	for (j = 0; j < m; ++j, yptr += n, cptr += n) {
+//		yx1[j] = image_splint(n, yptr, cptr, x2o);
+//	}
+//	image_spline(m, yx1, 1E30, 1E30, cx1);
+//	yo = image_splint(m, yx1, cx1, x1o);
+//
+//	delete []cx1;
+//	delete []yx1;
+//	return float(yo);
+	return 0.0;
+}
 
-	for (j = 0; j < m; ++j, yptr += n, cptr += n) {
-		yx1[j] = bksplint(n, yptr, cptr, x2o);
-	}
-	bkspline(m, yx1, 1E30, 1E30, cx1);
-	yo = bksplint(m, yx1, cx1, x1o);
+void ADIReduct::line_splint2(int m, int n, float y[], double c[], double line, float yx[]) {
 
-	delete []cx1;
-	delete []yx1;
-	return float(yo);
 }
 
 void ADIReduct::alloc_buffer() {
 	if (!(pixels_ == frame_->pixels && databuf_.unique())) {
 		pixels_ = frame_->pixels;
 		databuf_.reset(new float[pixels_]);
-		databk_.reset (new float[pixels_]);
-		datarms_.reset(new float[pixels_]);
 	}
 
 	nbkw_ = frame_->wdim / param_->bkw;
@@ -146,8 +175,8 @@ void ADIReduct::alloc_buffer() {
 		nbk_ = nbkw_ * nbkh_;
 		bkmean_.reset   (new float[nbk_]);
 		bksig_.reset    (new float[nbk_]);
-		dx2mean_.reset  (new double[nbk_]);
-		dx2sig_.reset   (new double[nbk_]);
+		d2mean_.reset  (new double[nbk_]);
+		d2sig_.reset   (new double[nbk_]);
 	}
 }
 
@@ -180,8 +209,8 @@ void ADIReduct::back_make() {
 	/* 背景网格滤波 */
 	back_filter();
 	/* 生成图背景和图像背景噪声位图 */
-	bkspline2(nbkh_, nbkw_, bkmean_.get(), dx2mean_.get());
-	bkspline2(nbkh_, nbkw_, bksig_.get(),  dx2sig_.get());
+	image_spline2(nbkh_, nbkw_, bkmean_.get(), d2mean_.get());	// 生成三次样条插值的二阶扰动矩
+	image_spline2(nbkh_, nbkw_, bksig_.get(),  d2sig_.get());
 
 #ifdef NDEBUG
 	FILE *fp1 = fopen("back.txt", "w");
@@ -396,7 +425,35 @@ void ADIReduct::back_filter() {
 }
 
 void ADIReduct::sub_back() {
+	double xstep(1.0 / frame_->wdim);
+	double ystep(1.0 / frame_->hdim);
+	double x, y;
+	float *data = frame_->dataimg.get();
+	float *buff = databuf_.get();
+	float *mean = bkmean_.get();
+	double *c   = d2mean_.get();
+	int i, j, k;
+	float t;
 
+	for (j = k = 0, y = (ystep - 1.0) * 0.5; j < frame_->hdim; ++j, y += ystep) {
+		for (i = 0, x= (xstep - 1.0) * 0.5; i < frame_->wdim; ++i, ++k, x += xstep) {
+			t = image_splint2(nbkh_, nbkw_, mean, c, y, x);
+			buff[k] = data[k] - t;
+		}
+	}
+	memcpy(data, buff, sizeof(float) * k);
+#ifdef NDEBUG
+	// 输出减背景后FITS文件
+	int naxis(2);
+	long naxes[] = { frame_->wdim, frame_->hdim };
+	long pixels = frame_->Pixels();
+	fitsfile *fitsptr;	//< 基于cfitsio接口的文件操作接口
+	int status(0);
+	fits_create_file(&fitsptr,"subtracted.fit", &status);
+	fits_create_img(fitsptr, FLOAT_IMG, naxis, naxes, &status);
+	fits_write_img(fitsptr, TFLOAT, 1, pixels, data, &status);
+	fits_close_file(fitsptr, &status);
+#endif
 }
 
 //////////////////////////////////////////////////////////////////////////////
