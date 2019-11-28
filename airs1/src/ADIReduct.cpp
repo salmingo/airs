@@ -48,18 +48,14 @@ bool ADIReduct::DoIt(ImgFrmPtr frame) {
 	ptime::time_duration_type tdt;
 //#endif
 	back_make();
-//#ifdef NDEBUG
-	tdt = microsec_clock::universal_time() - now;
-	printf ("back_make() ellapsed: %lld microsec\n", tdt.total_microseconds());
-//#endif
 	sub_back();
-//#ifdef NDEBUG
-	tdt = microsec_clock::universal_time() - now;
-	printf ("sub_back() ellapsed: %lld microsec\n", tdt.total_microseconds());
-//#endif
 	// 信号滤波: 用于信号提取
 	// 信号提取与聚合
 	// 目标提取与计算
+//#ifdef NDEBUG
+	tdt = microsec_clock::universal_time() - now;
+	printf ("ellapsed: %lld microsec\n", tdt.total_microseconds());
+//#endif
 
 	return false;
 }
@@ -87,18 +83,17 @@ void ADIReduct::image_spline(int n, float *y, double yp1, double ypn, double *c)
 		c[0] = -0.5;
 		u[0] = 3.0 * (y[1] - y[0] - yp1);
 	}
+	for (i = 1; i < nm1; ++i) {
+		p   = 1.0 / (c[i - 1] + 4.0);
+		c[i] = -p;
+		u[i] = p * (6.0 * (y[i + 1] + y[i - 1] - 2 * y[i]) - u[i - 1]);
+	}
 	if (ypn >= 1E30) {
 		qn = un = 0.0;
 	}
 	else {
 		qn = 0.5;
 		un = 3.0 * (ypn - y[nm1] + y[nm2]);
-	}
-
-	for (i = 1; i < nm1; ++i) {
-		p = -1.0 / (c[i - 1] + 4.0);
-		c[i] = p;
-		u[i] = p * (u[i - 1] - 6.0 * (y[i + 1] + y[i - 1] - y[i] * 2));
 	}
 	c[nm1] = (un - qn * u[nm2]) / (qn * c[nm2] + 1.0);
 	for (i = nm2; i >= 0; --i) c[i] = c[i] * c[i + 1] + u[i];
@@ -108,14 +103,12 @@ void ADIReduct::image_spline(int n, float *y, double yp1, double ypn, double *c)
 
 float ADIReduct::image_splint(int n, float *y, double *c, double xo) {
 	int nx = int(xo);
-	int low, high;
 	double a, b, yo;
 
-	low  = xo <= 0.0 ? 0 : (nx == n - 1 ? n - 2 : nx);
-	high = low + 1;
-	a = high - xo;
-	b = 1.0 - a;
-	yo = a * y[low] + b * y[high] + (a * (a * a - 1.0) * c[low] + b * (b * b - 1.0) * c[high]) / 6.0;
+	if (nx == (n - 1)) --nx;
+	b = xo - nx;
+	a = 1.0 - b;
+	yo = a * y[nx] + b * y[nx + 1] + (a * (a * a - 1.0) * c[nx] + b * (b * b - 1.0) * c[nx + 1]) / 6.0;
 	return float(yo);
 }
 
@@ -139,22 +132,21 @@ void ADIReduct::image_spline2(int m, int n, float y[], double c[]) {
 
 float ADIReduct::image_splint2(int m, int n, float y[], double c[], double x1o, double x2o) {
 	int nx1o = int(x1o);
-	int low_x1o;
-	int i, j, k;
+	int i, k;
 	float *low, *high;
 	float *yx2  = new float[n];		// 参与计算X轴扰动量的拟合值
 	double *cx2 = new double[n];
 	double a, b, a3, b3, yo;
 
-	low_x1o  = nx1o <= 0.0 ? 0 :(nx1o == m - 1 ? m - 2 : nx1o);
-	b = x1o = low_x1o;
+	if (nx1o == (m - 1)) --nx1o;
+	b = x1o - nx1o;
 	a = 1.0 - b;
 	a3 = a * (a * a - 1.0) / 6.0;
 	b3 = b * (b * b - 1.0) / 6.0;
-	low  = y + low_x1o * n;
+	low  = y + nx1o * n;
 	high = low + n;
 
-	for (i =0, k = low_x1o; i < n; ++i, k += m, ++low, ++high) {
+	for (i =0, k = nx1o; i < n; ++i, k += m, ++low, ++high) {
 		yx2[i] = a * *low + b * *high + a3 * c[k] + b3 * c[k + 1];
 	}
 	image_spline(n, yx2, 1E30, 1E30, cx2);
@@ -167,25 +159,24 @@ float ADIReduct::image_splint2(int m, int n, float y[], double c[], double x1o, 
 
 void ADIReduct::line_splint2(int m, int n, float y[], double c[], double line, float yx[]) {
 	int nx1o = int(line);
-	int low_x1o;
-	int i, j, k;
+	int i, k;
 	int wimg = frame_->wdim;
 	float *low, *high;
 	float *yx2  = new float[n];		// 参与计算X轴扰动量的拟合值
 	double xstep = 1.0 / wimg;
 	double x = (xstep - 1.0) * 0.5;
 	double *cx2 = new double[n];
-	double a, b, a3, b3, yo;
+	double a, b, a3, b3;
 
-	low_x1o  = nx1o <= 0.0 ? 0 :(nx1o == m - 1 ? m - 2 : nx1o);
-	b = line = low_x1o;
+	if (nx1o == (m - 1)) --nx1o;
+	b = line - nx1o;
 	a = 1.0 - b;
 	a3 = a * (a * a - 1.0) / 6.0;
 	b3 = b * (b * b - 1.0) / 6.0;
-	low  = y + low_x1o * n;
+	low  = y + nx1o * n;
 	high = low + n;
 
-	for (i =0, k = low_x1o; i < n; ++i, k += m, ++low, ++high) {
+	for (i =0, k = nx1o; i < n; ++i, k += m, ++low, ++high) {
 		yx2[i] = a * *low + b * *high + a3 * c[k] + b3 * c[k + 1];
 	}
 	image_spline(n, yx2, 1E30, 1E30, cx2);
@@ -461,24 +452,6 @@ void ADIReduct::back_filter() {
 }
 
 void ADIReduct::sub_back() {
-//	double xstep(1.0 / frame_->wdim);
-//	double ystep(1.0 / frame_->hdim);
-//	double x, y;
-//	float *data = frame_->dataimg.get();
-//	float *buff = databuf_.get();
-//	float *mean = bkmean_.get();
-//	double *c   = d2mean_.get();
-//	int i, j, k;
-//	float t;
-//
-//	for (j = k = 0, y = (ystep - 1.0) * 0.5; j < frame_->hdim; ++j, y += ystep) {
-//		for (i = 0, x= (xstep - 1.0) * 0.5; i < frame_->wdim; ++i, ++k, x += xstep) {
-//			t = image_splint2(nbkh_, nbkw_, mean, c, y, x);
-//			buff[k] = data[k] - t;
-//		}
-//	}
-
-//	void line_splint2(int m, int n, float y[], double c[], double line, float yx[])
 	int himg(frame_->hdim), wimg(frame_->wdim), i, j;
 	float *data = frame_->dataimg.get();
 	float *buff = databuf_.get();
