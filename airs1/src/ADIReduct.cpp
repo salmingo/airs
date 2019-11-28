@@ -43,20 +43,20 @@ ADIReduct::~ADIReduct() {
 bool ADIReduct::DoIt(ImgFrmPtr frame) {
 	frame_ = frame;
 	alloc_buffer();
-#ifdef NDEBUG
+//#ifdef NDEBUG
 	ptime now = microsec_clock::universal_time();
 	ptime::time_duration_type tdt;
-#endif
+//#endif
 	back_make();
-#ifdef NDEBUG
+//#ifdef NDEBUG
 	tdt = microsec_clock::universal_time() - now;
 	printf ("back_make() ellapsed: %lld microsec\n", tdt.total_microseconds());
-#endif
+//#endif
 	sub_back();
-#ifdef NDEBUG
+//#ifdef NDEBUG
 	tdt = microsec_clock::universal_time() - now;
 	printf ("sub_back() ellapsed: %lld microsec\n", tdt.total_microseconds());
-#endif
+//#endif
 	// 信号滤波: 用于信号提取
 	// 信号提取与聚合
 	// 目标提取与计算
@@ -138,27 +138,63 @@ void ADIReduct::image_spline2(int m, int n, float y[], double c[]) {
 }
 
 float ADIReduct::image_splint2(int m, int n, float y[], double c[], double x1o, double x2o) {
-//	float *yx1 = new float[m];
-//	float *yptr = y;
-//	double *cptr = c;
-//	double *cx1 = new double[m];
-//	double yo;
-//	int j;
-//
-//	for (j = 0; j < m; ++j, yptr += n, cptr += n) {
-//		yx1[j] = image_splint(n, yptr, cptr, x2o);
-//	}
-//	image_spline(m, yx1, 1E30, 1E30, cx1);
-//	yo = image_splint(m, yx1, cx1, x1o);
-//
-//	delete []cx1;
-//	delete []yx1;
-//	return float(yo);
-	return 0.0;
+	int nx1o = int(x1o);
+	int low_x1o;
+	int i, j, k;
+	float *low, *high;
+	float *yx2  = new float[n];		// 参与计算X轴扰动量的拟合值
+	double *cx2 = new double[n];
+	double a, b, a3, b3, yo;
+
+	low_x1o  = nx1o <= 0.0 ? 0 :(nx1o == m - 1 ? m - 2 : nx1o);
+	b = x1o = low_x1o;
+	a = 1.0 - b;
+	a3 = a * (a * a - 1.0) / 6.0;
+	b3 = b * (b * b - 1.0) / 6.0;
+	low  = y + low_x1o * n;
+	high = low + n;
+
+	for (i =0, k = low_x1o; i < n; ++i, k += m, ++low, ++high) {
+		yx2[i] = a * *low + b * *high + a3 * c[k] + b3 * c[k + 1];
+	}
+	image_spline(n, yx2, 1E30, 1E30, cx2);
+	yo = image_splint(n, yx2, cx2, x2o);
+
+	delete []yx2;
+	delete []cx2;
+	return float(yo);
 }
 
 void ADIReduct::line_splint2(int m, int n, float y[], double c[], double line, float yx[]) {
+	int nx1o = int(line);
+	int low_x1o;
+	int i, j, k;
+	int wimg = frame_->wdim;
+	float *low, *high;
+	float *yx2  = new float[n];		// 参与计算X轴扰动量的拟合值
+	double xstep = 1.0 / wimg;
+	double x = (xstep - 1.0) * 0.5;
+	double *cx2 = new double[n];
+	double a, b, a3, b3, yo;
 
+	low_x1o  = nx1o <= 0.0 ? 0 :(nx1o == m - 1 ? m - 2 : nx1o);
+	b = line = low_x1o;
+	a = 1.0 - b;
+	a3 = a * (a * a - 1.0) / 6.0;
+	b3 = b * (b * b - 1.0) / 6.0;
+	low  = y + low_x1o * n;
+	high = low + n;
+
+	for (i =0, k = low_x1o; i < n; ++i, k += m, ++low, ++high) {
+		yx2[i] = a * *low + b * *high + a3 * c[k] + b3 * c[k + 1];
+	}
+	image_spline(n, yx2, 1E30, 1E30, cx2);
+	for (i = 0; i < wimg; ++i, x += xstep) {
+		yx[i] = float(image_splint(n, yx2, cx2, x));
+	}
+
+	delete []yx2;
+	delete []cx2;
 }
 
 void ADIReduct::alloc_buffer() {
@@ -425,24 +461,44 @@ void ADIReduct::back_filter() {
 }
 
 void ADIReduct::sub_back() {
-	double xstep(1.0 / frame_->wdim);
-	double ystep(1.0 / frame_->hdim);
-	double x, y;
+//	double xstep(1.0 / frame_->wdim);
+//	double ystep(1.0 / frame_->hdim);
+//	double x, y;
+//	float *data = frame_->dataimg.get();
+//	float *buff = databuf_.get();
+//	float *mean = bkmean_.get();
+//	double *c   = d2mean_.get();
+//	int i, j, k;
+//	float t;
+//
+//	for (j = k = 0, y = (ystep - 1.0) * 0.5; j < frame_->hdim; ++j, y += ystep) {
+//		for (i = 0, x= (xstep - 1.0) * 0.5; i < frame_->wdim; ++i, ++k, x += xstep) {
+//			t = image_splint2(nbkh_, nbkw_, mean, c, y, x);
+//			buff[k] = data[k] - t;
+//		}
+//	}
+
+//	void line_splint2(int m, int n, float y[], double c[], double line, float yx[])
+	int himg(frame_->hdim), wimg(frame_->wdim), i, j;
 	float *data = frame_->dataimg.get();
 	float *buff = databuf_.get();
 	float *mean = bkmean_.get();
+	float *line = new float[wimg];
 	double *c   = d2mean_.get();
-	int i, j, k;
-	float t;
+	double ystep(1.0 / himg);
+	double y = (ystep - 1.0) * 0.5;
 
-	for (j = k = 0, y = (ystep - 1.0) * 0.5; j < frame_->hdim; ++j, y += ystep) {
-		for (i = 0, x= (xstep - 1.0) * 0.5; i < frame_->wdim; ++i, ++k, x += xstep) {
-			t = image_splint2(nbkh_, nbkw_, mean, c, y, x);
-			buff[k] = data[k] - t;
+	for (j = 0; j < himg; ++j, y += ystep) {
+		line_splint2(nbkh_, nbkw_, mean, c, y, line);
+		for (i = 0; i < wimg; ++i, ++buff, ++data) {
+			*buff = *data - line[i];
 		}
 	}
-	memcpy(data, buff, sizeof(float) * k);
+	memcpy(frame_->dataimg.get(), databuf_.get(), sizeof(float) * wimg);
+
+	delete []line;
 #ifdef NDEBUG
+	remove("subtracted.fit");
 	// 输出减背景后FITS文件
 	int naxis(2);
 	long naxes[] = { frame_->wdim, frame_->hdim };
