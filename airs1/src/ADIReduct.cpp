@@ -6,7 +6,8 @@
 
 #include <cstdlib>
 #include <cstdio>
-#include <string.h>
+#include <cstring>
+#include <cmath>
 #include <boost/make_shared.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <longnam.h>
@@ -26,13 +27,14 @@ ADIReductPtr make_reduct(Parameter *param) {
 //////////////////////////////////////////////////////////////////////////////
 ADIReduct::ADIReduct(Parameter *param)
 	: nsigma_(5.0),		// 统计区间: ±5σ
-	  maxlevel_(4096),	// 最大分级数: 4096
+	  nmaxlevel_(4096),	// 最大分级数: 4096
 	  cntmin_(4),		// 区间最小数量: 4
-	  good_ (0.5) {		// 阈值: 数据质量, 50%以上数据参与统计
+	  good_ (0.5),		// 阈值: 数据质量, 50%以上数据参与统计
+	  nmaxfo_(1024) {	// 卷积核最大存储空间: 32*32
 	param_  = param;
 	pixels_ = 0;
-	nbkw_ = nbkh_ = 0;
-	nbk_  = 0;
+	nbkw_   = nbkh_ = 0;
+	nbk_    = 0;
 	stephisto_ = sqrt(2.0 / API) * nsigma_ / cntmin_;
 }
 
@@ -41,22 +43,16 @@ ADIReduct::~ADIReduct() {
 }
 
 bool ADIReduct::DoIt(ImgFrmPtr frame) {
+	ptime now = microsec_clock::local_time();
 	frame_ = frame;
 	alloc_buffer();
-//#ifdef NDEBUG
-	ptime now = microsec_clock::universal_time();
-	ptime::time_duration_type tdt;
-//#endif
 	back_make();
 	sub_back();
-	// 信号滤波: 用于信号提取
+	if (param_->ufo && load_filter_conv(param_->pathfo))
+		filter_convolve();
 	// 信号提取与聚合
 	// 目标提取与计算
-//#ifdef NDEBUG
-	tdt = microsec_clock::universal_time() - now;
-	printf ("ellapsed: %lld microsec\n", tdt.total_microseconds());
-//#endif
-
+	printf ("ellapsed: %.1f sec\n", (microsec_clock::local_time() - now).total_microseconds() * 1E-6);
 	return false;
 }
 
@@ -112,42 +108,40 @@ float ADIReduct::image_splint(int n, float *y, double *c, double xo) {
 	return float(yo);
 }
 
-/*!
- * @brief 生成列列优先存储的二阶扰动矩
- * @note
- * - y: 原始数据数组, 长度==m*n, 对应bkmean_或bksig_
- * - c: 二阶扰动矩, 长度==n*m
- */
 void ADIReduct::image_spline2(int m, int n, float y[], double c[]) {
-	double *cptr = c;	// n*m
 	float *ytmp  = new float[m];
+	double *ctmp = new double[m];
 	int i, j, k;
 
-	for (i = 0; i < n; ++i, cptr += m) {
+	for (i = 0; i < n; ++i) {
 		for (j = 0, k = i; j < m; ++j, k += n) ytmp[j] = y[k];
-		image_spline(m, ytmp, 1E30, 1E30, cptr);
+		image_spline(m, ytmp, 1E30, 1E30, ctmp);
+		for (j = 0, k = i; j < m; ++j, k += n) c[k] = ctmp[j];
 	}
+	delete []ctmp;
 	delete []ytmp;
 }
 
 float ADIReduct::image_splint2(int m, int n, float y[], double c[], double x1o, double x2o) {
-	int nx1o = int(x1o);
-	int i, k;
+	int nx = int(x1o);
 	float *low, *high;
 	float *yx2  = new float[n];		// 参与计算X轴扰动量的拟合值
 	double *cx2 = new double[n];
+	double *dlow, *dhigh;
 	double a, b, a3, b3, yo;
 
-	if (nx1o == (m - 1)) --nx1o;
-	b = x1o - nx1o;
+	if (nx == (m - 1)) --nx;
+	b = x1o - nx;
 	a = 1.0 - b;
 	a3 = a * (a * a - 1.0) / 6.0;
 	b3 = b * (b * b - 1.0) / 6.0;
-	low  = y + nx1o * n;
-	high = low + n;
+	low   = y + nx * n;
+	high  = low + n;
+	dlow  = c + nx * n;
+	dhigh = dlow + n;
 
-	for (i =0, k = nx1o; i < n; ++i, k += m, ++low, ++high) {
-		yx2[i] = a * *low + b * *high + a3 * c[k] + b3 * c[k + 1];
+	for (int i =0; i < n; ++i, ++low, ++high, ++dlow, ++dhigh) {
+		yx2[i] = a * *low + b * *high + a3 * *dlow + b3 * *dhigh;
 	}
 	image_spline(n, yx2, 1E30, 1E30, cx2);
 	yo = image_splint(n, yx2, cx2, x2o);
@@ -158,26 +152,29 @@ float ADIReduct::image_splint2(int m, int n, float y[], double c[], double x1o, 
 }
 
 void ADIReduct::line_splint2(int m, int n, float y[], double c[], double line, float yx[]) {
-	int nx1o = int(line);
-	int i, k;
+	int nx = int(line);
+	int i;
 	int wimg = frame_->wdim;
 	float *low, *high;
 	float *yx2  = new float[n];		// 参与计算X轴扰动量的拟合值
-	double xstep = 1.0 / wimg;
+	double xstep = 1.0 / param_->bkw;
 	double x = (xstep - 1.0) * 0.5;
 	double *cx2 = new double[n];
+	double *dlow, *dhigh;
 	double a, b, a3, b3;
 
-	if (nx1o == (m - 1)) --nx1o;
-	b = line - nx1o;
+	if (nx == (m - 1)) --nx;
+	b = line - nx;
 	a = 1.0 - b;
 	a3 = a * (a * a - 1.0) / 6.0;
 	b3 = b * (b * b - 1.0) / 6.0;
-	low  = y + nx1o * n;
-	high = low + n;
+	low   = y + nx * n;
+	high  = low + n;
+	dlow  = c + nx * n;
+	dhigh = dlow + n;
 
-	for (i =0, k = nx1o; i < n; ++i, k += m, ++low, ++high) {
-		yx2[i] = a * *low + b * *high + a3 * c[k] + b3 * c[k + 1];
+	for (i =0; i < n; ++i, ++low, ++high, ++dlow, ++dhigh) {
+		yx2[i] = a * *low + b * *high + a3 * *dlow + b3 * *dhigh;
 	}
 	image_spline(n, yx2, 1E30, 1E30, cx2);
 	for (i = 0; i < wimg; ++i, x += xstep) {
@@ -200,11 +197,12 @@ void ADIReduct::alloc_buffer() {
 	if (nbkh_ * param_->bkh < frame_->hdim) ++nbkh_;
 	if (nbk_ < nbkw_ * nbkh_) {
 		nbk_ = nbkw_ * nbkh_;
-		bkmean_.reset   (new float[nbk_]);
-		bksig_.reset    (new float[nbk_]);
+		bkmean_.reset  (new float[nbk_]);
+		bksig_.reset   (new float[nbk_]);
 		d2mean_.reset  (new double[nbk_]);
 		d2sig_.reset   (new double[nbk_]);
 	}
+	if (!foconv_.kernel.unique()) foconv_.kernel.reset(new double[nmaxfo_]);
 }
 
 void ADIReduct::back_make() {
@@ -301,7 +299,7 @@ bool ADIReduct::back_stat(int ix, int iy, int bkw, int bkh, int wimg, BackGrid &
 	}
 	mean /= npix;
 	sigma = ((sig = sigma / npix - mean * mean) > 0.0) ? sqrt(sig) : 0.0;
-	if ((grid.nlevel = int(stephisto_ * npix + 1)) > maxlevel_) grid.nlevel = maxlevel_;
+	if ((grid.nlevel = int(stephisto_ * npix + 1)) > nmaxlevel_) grid.nlevel = nmaxlevel_;
 	grid.scale = float(sigma > 0.0 ? 0.5 * grid.nlevel / (nsigma_ * sigma) : 1.0);
 	grid.zero  = float(mean - nsigma_ * sigma);
 	grid.mean  = float(mean);
@@ -458,7 +456,7 @@ void ADIReduct::sub_back() {
 	float *mean = bkmean_.get();
 	float *line = new float[wimg];
 	double *c   = d2mean_.get();
-	double ystep(1.0 / himg);
+	double ystep(1.0 / param_->bkh);
 	double y = (ystep - 1.0) * 0.5;
 
 	for (j = 0; j < himg; ++j, y += ystep) {
@@ -467,22 +465,88 @@ void ADIReduct::sub_back() {
 			*buff = *data - line[i];
 		}
 	}
-	memcpy(frame_->dataimg.get(), databuf_.get(), sizeof(float) * wimg);
+	memcpy(frame_->dataimg.get(), databuf_.get(), sizeof(float) * wimg * himg);
 
 	delete []line;
 #ifdef NDEBUG
 	remove("subtracted.fit");
 	// 输出减背景后FITS文件
-	int naxis(2);
-	long naxes[] = { frame_->wdim, frame_->hdim };
+	long naxes[] = { wimg, himg };
 	long pixels = frame_->Pixels();
 	fitsfile *fitsptr;	//< 基于cfitsio接口的文件操作接口
 	int status(0);
 	fits_create_file(&fitsptr,"subtracted.fit", &status);
-	fits_create_img(fitsptr, FLOAT_IMG, naxis, naxes, &status);
-	fits_write_img(fitsptr, TFLOAT, 1, pixels, data, &status);
+	fits_create_img(fitsptr, FLOAT_IMG, 2, naxes, &status);
+	fits_write_img(fitsptr, TFLOAT, 1, pixels, databuf_.get(), &status);
 	fits_close_file(fitsptr, &status);
 #endif
+}
+
+/*
+ * 卷积核文件格式:
+ * 1. 文本文件, 行为单位
+ * 2. 首行: CONV (NO)NORM
+ * 3. 二行: 注释, #起首作为标志符
+ * 4. 其它: 卷积核
+ */
+bool ADIReduct::load_filter_conv(const string &filepath) {
+	if (foconv_.loaded) return true;
+	/* 尝试从文件中加载滤波器 */
+	FILE *fp = fopen(filepath.c_str(), "r");
+	if (!fp) return false;
+
+	bool flag_norm(true);
+	int i(0), j(0), k(0), n(0);
+	const int MAXCHAR = 512;
+	char line[MAXCHAR], seps[] = " \t\r\n", *tok;
+	dblarr kernel = foconv_.kernel;
+
+	fgets(line, MAXCHAR, fp);
+	if (strncmp(line, "CONV", 4)) {
+		fclose(fp);
+		return false;
+	}
+	if (strstr(line, "NORM")) flag_norm = strstr(line, "NONORM") == NULL;
+
+	while (fgets(line, MAXCHAR, fp)) {
+		tok = strtok(line, seps);
+		if (tok && tok[0] == '#') continue;
+		++j;
+		for (k = 0; tok;) {
+			kernel[i] = atof(tok);
+			// 滤波器限制: 32*32
+			if (++i > nmaxfo_) {
+				fclose(fp);
+				return false;
+			}
+			++k;
+			tok = strtok(NULL, seps);
+		}
+		if (k > n) n = k;
+	}
+	fclose(fp);
+
+	if (flag_norm) {/* 检查滤波器并归一化 */
+		if ((foconv_.width = n) < 1) return false;
+		if (j * n < i) return false;
+		foconv_.height = j;
+
+		double t, sum, var;
+		for (j = 0, sum = var = 0.0; j < i; ++j) {
+			sum += (t = kernel[j]);
+			var += t * t;
+		}
+		var = sqrt(var);
+		if (sum <= 0.0) sum = var;
+		for (j = 0; j < i; ++j) kernel[j] /= sum;
+	}
+
+	foconv_.loaded = true;
+	return true;
+}
+
+void ADIReduct::filter_convolve() {
+	// databuf_存储滤波后结果, 用于信号提取及目标聚合; dataimg_存储滤波钱结果, 用于特征计算
 }
 
 //////////////////////////////////////////////////////////////////////////////

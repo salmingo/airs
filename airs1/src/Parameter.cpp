@@ -59,7 +59,7 @@ void Parameter::Init(const string &filepath) {
 	pt2.add("Area.<xmlattr>.Maximum",          0);
 	pt2.add("<xmlcomment>", "Area.Maximum == 0 means unlimited");
 	pt2.add("Filter.<xmlattr>.Enable",         false);
-	pt2.add("Filter.<xmlattr>.Filepath",       "");
+	pt2.add("Filter.<xmlattr>.Filepath",       "/usr/local/etc/default.conv");
 	pt2.add("<xmlcomment>", "use filter to detect signal");
 	pt2.add("CleanSpurious.<xmlattr>.Enable",  true);
 

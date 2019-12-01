@@ -25,6 +25,16 @@ struct BackGrid {
 	float zero;		//< 零点
 };
 
+/*!
+ * @struct FilterConv 卷积滤波
+ */
+struct FilterConv {
+	bool loaded;	//< 加载标志
+	int width;		//< 宽度
+	int height;		//< 高度
+	dblarr kernel;	//< 卷积核
+};
+
 class ADIReduct {
 public:
 	ADIReduct(Parameter *param);
@@ -34,9 +44,10 @@ protected:
 	Parameter *param_;	//< 配置参数
 	ImgFrmPtr frame_;	//< 图像数据
 	const double nsigma_;	//< 统计区间
-	const int maxlevel_;//< 分级数: 最大
-	const int cntmin_;	//< 统计区间计数: 最小
-	const double good_;	//< 阈值: 数据质量
+	const int nmaxlevel_;	//< 分级数: 最大
+	const int cntmin_;		//< 统计区间计数: 最小
+	const double good_;		//< 阈值: 数据质量
+	const int nmaxfo_;		//< 信号提取卷积核的最大存储空间
 	double stephisto_;	//< 直方图统计步长
 	int pixels_;		//< 图像像素数
 	int nbkw_;			//< 宽度方向网格数量
@@ -47,6 +58,7 @@ protected:
 	fltarr bksig_;		//< 缓存区: 网格噪声
 	dblarr d2mean_;		//< 缓存区: 背景网格二元三次样条二阶扰动矩, Y方向快速变化样条插值系数矩阵
 	dblarr d2sig_;		//< 缓存区: 网格噪声二元三次样条二阶扰动矩, Y方向快速变化样条插值系数矩阵
+	FilterConv foconv_;	//< 卷积滤波
 
 public:
 	/*!
@@ -84,13 +96,11 @@ protected:
 	 */
 	float image_splint(int n, float *y, double *c, double xo);
 	/*!
-	 * @brief 计算二元三次样条内插系数
+	 * @brief 沿Y轴生成二元三次样条内插系数
 	 * @param m   慢速自变量长度
 	 * @param n   快速自变量长度
 	 * @param y   样本: 因变量数组, m*n数组
-	 * @param c   内插系数拟合结果, n*m数组, 列优先存储
-	 * @note
-	 * 生成n*m二阶扰动矩阵, 对应图像中Y方向优先存储
+	 * @param c   内插系数拟合结果, m*n数组, 行优先存储
 	 */
 	void image_spline2(int m, int n, float y[], double c[]);
 	/*!
@@ -115,6 +125,19 @@ protected:
 	 * @param yx    行line中各x位置的拟合值, 1*n数组
 	 */
 	void line_splint2(int m, int n, float y[], double c[], double line, float yx[]);
+	/*!
+	 * @brief 加载卷积滤波核
+	 * @param filename 文件名
+	 * @return
+	 * 卷积核加载结果
+	 * @note
+	 * 卷积滤波核以文本文件存储
+	 */
+	bool load_filter_conv(const string &filepath);
+	/*!
+	 * @brief 对图像数据逐点卷积, 用于信号提取
+	 */
+	void filter_convolve();
 
 protected:
 	/*!

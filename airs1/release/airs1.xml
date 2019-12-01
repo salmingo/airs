@@ -16,7 +16,7 @@
     <Analysis SNR="10"/>
     <Area Minimum="3" Maximum="0"/>
     <!--Area.Maximum == 0 means unlimited-->
-    <Filter Enable="false" Filepath=""/>
+    <Filter Enable="false" Filepath="default.conv"/>
     <!--use filter to detect signal-->
     <CleanSpurious Enable="true"/>
 </ImageReduct>

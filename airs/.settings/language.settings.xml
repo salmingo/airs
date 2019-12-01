@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <project>
     	
-    <configuration id="org.eclipse.linuxtools.cdt.autotools.core.toolChain.704225600" name="Build (GNU)">
+    <configuration id="org.eclipse.linuxtools.cdt.autotools.core.toolChain.1566197460" name="Build (GNU)">
         		
         <extension point="org.eclipse.cdt.core.LanguageSettingsProvider">
             			

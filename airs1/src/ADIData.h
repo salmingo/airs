@@ -37,7 +37,7 @@ typedef struct Point3f {
  */
 struct ObjectInfo {
 	/* 图像测量结果 */
-	PT2F ptc;			//< 几何中心
+	PT2F ptpeak;		//< 峰值位置
 	PT2F ptbc;			//< 质心
 	double flux;		//< 流量: 归算到1秒曝光时间
 	double mag_img;		//< 星等
