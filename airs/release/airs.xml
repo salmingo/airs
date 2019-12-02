@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <version>0.1</version>
-<date>20191116T061759</date>
+<date>20191202T010547</date>
 <GeoSite Name="HN">
     <Location Lon="111.714" Lat="16.450800000000001" Alt="10" Timezone="8"/>
 </GeoSite>
@@ -17,7 +17,7 @@
 <Database Enable="false">
     <URL Addr="http://172.28.8.8:8080/gwebend/"/>
 </Database>
-<GeneralControl Enable="true">
+<GeneralControl Enable="false">
     <Host IPv4="127.0.0.1" Port="4010"/>
 </GeneralControl>
 <FileServer Enable="false">

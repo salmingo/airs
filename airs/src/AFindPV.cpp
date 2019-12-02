@@ -47,8 +47,6 @@ void AFindPV::new_sequence() {
 
 void AFindPV::end_sequence() {
 	if (last_fno_ != INT_MAX) {
-		recheck_candidates();	// 检查候选体的有效性
-		append_candidates(); 	// 尝试将该帧数据加入候选体
 		complete_candidates();	// 将所有候选体转换为目标
 		frmprev_.reset();
 		frmnow_.reset();

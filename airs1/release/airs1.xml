@@ -12,11 +12,11 @@
     <!--<size> or <width>, <height>-->
     <BackFilter Size="3"/>
     <!--<size> or <width>, <height>-->
-    <Detect SNR="1.5"/>
-    <Analysis SNR="10"/>
+    <Detect SNR="3"/>
+    <Analysis SNR="4"/>
     <Area Minimum="3" Maximum="0"/>
     <!--Area.Maximum == 0 means unlimited-->
-    <Filter Enable="false" Filepath="default.conv"/>
+    <Filter Enable="true" Filepath="/usr/local/etc/sex-param/default.conv"/>
     <!--use filter to detect signal-->
     <CleanSpurious Enable="true"/>
 </ImageReduct>

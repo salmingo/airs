@@ -19,6 +19,7 @@
 #include <vector>
 #include <algorithm>
 #include <boost/make_shared.hpp>
+#include <boost/filesystem.hpp>
 #include "globaldef.h"
 #include "Parameter.h"
 #include "daemon.h"
@@ -27,6 +28,7 @@
 
 using namespace std;
 using namespace boost::posix_time;
+using namespace boost::filesystem;
 
 typedef vector<string> vecstr;
 boost::shared_ptr<GLog> _gLog;
@@ -107,13 +109,23 @@ int main(int argc, char **argv) {
 		if (is_daemon) _gLog->Write("Daemon goes running");
 		if (!is_daemon) {
 			vecstr files;
+			int n;
 			for (int i = 0; i < argc; ++i) {
-				files.push_back(argv[i]);
+				path pathname(argv[i]);
+				if (is_directory(pathname)) {
+					for (directory_iterator x = directory_iterator(pathname); x != directory_iterator(); ++x) {
+						if (x->path().extension().string().rfind(".fit") != string::npos) {
+							files.push_back(x->path().string());
+						}
+					}
+				}
+				else if (is_regular_file(pathname)) files.push_back(argv[i]);
 			}
 			sort(files.begin(), files.end(), [](const string &name1, const string &name2) {
 				return name1 < name2;
 			});
-			for (int i = 0; i < argc; ++i) 	doProcess->ProcessImage(files[i]);
+			n = files.size();
+			for (int i = 0; i < n; ++i) 	doProcess->ProcessImage(files[i]);
 		}
 		ios.run();
 		if (is_daemon) _gLog->Write("Daemon stop running");

@@ -202,7 +202,7 @@ void ADIReduct::alloc_buffer() {
 		d2mean_.reset  (new double[nbk_]);
 		d2sig_.reset   (new double[nbk_]);
 	}
-	if (!foconv_.kernel.unique()) foconv_.kernel.reset(new double[nmaxfo_]);
+	if (!foconv_.mask.unique()) foconv_.mask.reset(new double[nmaxfo_]);
 }
 
 void ADIReduct::back_make() {
@@ -315,17 +315,13 @@ void ADIReduct::back_histo(int ix, int iy, int bkw, int bkh, int wimg, int *hist
 	float *buf;
 	int nlevel(grid.nlevel);
 	int i, x, y, offset;
-	int n(0);
 
 	memset(histo, 0, sizeof(int) * grid.nlevel);
 	offset = wimg - bkw;
 	for (y = 0, buf = data; y < bkh; ++y, buf += offset) {
 		for (x = 0; x < bkw; ++x, ++buf) {
 			i = int(*buf * scale + cste);
-			if (i >= 0 && i < nlevel) {
-				++n;
-				++histo[i];
-			}
+			if (i >= 0 && i < nlevel) ++histo[i];
 		}
 	}
 }
@@ -499,7 +495,7 @@ bool ADIReduct::load_filter_conv(const string &filepath) {
 	int i(0), j(0), k(0), n(0);
 	const int MAXCHAR = 512;
 	char line[MAXCHAR], seps[] = " \t\r\n", *tok;
-	dblarr kernel = foconv_.kernel;
+	dblarr mask = foconv_.mask;
 
 	fgets(line, MAXCHAR, fp);
 	if (strncmp(line, "CONV", 4)) {
@@ -513,7 +509,7 @@ bool ADIReduct::load_filter_conv(const string &filepath) {
 		if (tok && tok[0] == '#') continue;
 		++j;
 		for (k = 0; tok;) {
-			kernel[i] = atof(tok);
+			mask[i] = atof(tok);
 			// 滤波器限制: 32*32
 			if (++i > nmaxfo_) {
 				fclose(fp);
@@ -533,12 +529,12 @@ bool ADIReduct::load_filter_conv(const string &filepath) {
 
 		double t, sum, var;
 		for (j = 0, sum = var = 0.0; j < i; ++j) {
-			sum += (t = kernel[j]);
+			sum += (t = mask[j]);
 			var += t * t;
 		}
 		var = sqrt(var);
 		if (sum <= 0.0) sum = var;
-		for (j = 0; j < i; ++j) kernel[j] /= sum;
+		for (j = 0; j < i; ++j) mask[j] /= sum;
 	}
 
 	foconv_.loaded = true;
@@ -547,6 +543,7 @@ bool ADIReduct::load_filter_conv(const string &filepath) {
 
 void ADIReduct::filter_convolve() {
 	// databuf_存储滤波后结果, 用于信号提取及目标聚合; dataimg_存储滤波钱结果, 用于特征计算
+
 }
 
 //////////////////////////////////////////////////////////////////////////////

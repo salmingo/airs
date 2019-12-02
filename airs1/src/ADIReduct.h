@@ -32,7 +32,7 @@ struct FilterConv {
 	bool loaded;	//< 加载标志
 	int width;		//< 宽度
 	int height;		//< 高度
-	dblarr kernel;	//< 卷积核
+	dblarr mask;	//< 卷积模板
 };
 
 class ADIReduct {
