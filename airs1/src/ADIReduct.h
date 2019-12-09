@@ -138,6 +138,16 @@ protected:
 	 * @brief 对图像数据逐点卷积, 用于信号提取
 	 */
 	void filter_convolve();
+	/*!
+	 * @brief 对像素做卷积
+	 * @param x       图像X坐标
+	 * @param y       图像Y坐标
+	 * @param mask    卷积模板
+	 * @param width   卷积宽度
+	 * @param height  卷积高度
+	 * @return
+	 */
+	float convolve(int x, int y, double *mask, int width, int height);
 
 protected:
 	/*!

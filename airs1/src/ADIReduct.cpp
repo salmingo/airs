@@ -541,9 +541,39 @@ bool ADIReduct::load_filter_conv(const string &filepath) {
 	return true;
 }
 
+float ADIReduct::convolve(int x, int y, double *mask, int width, int height) {
+	double sum(0.0);
+	int himg(frame_->hdim), wimg(frame_->wdim);
+
+	return 0.0;
+}
+
 void ADIReduct::filter_convolve() {
 	// databuf_存储滤波后结果, 用于信号提取及目标聚合; dataimg_存储滤波钱结果, 用于特征计算
+	int himg(frame_->hdim), wimg(frame_->wdim), i, j;
+	float *data = frame_->dataimg.get();
+	float *buff = databuf_.get();
+	double *mask = foconv_.mask.get();
+	int width = foconv_.width;
+	int height = foconv_.height;
+	int n(0);
+	float *sigma = bksig_.get();
+	float *line = new float[wimg];
+	double *c   = d2sig_.get();
+	double ystep(1.0 / param_->bkh);
+	double y = (ystep - 1.0) * 0.5;
 
+	for (j = 0; j < himg; ++j, y += ystep) {
+		line_splint2(nbkh_, nbkw_, sigma, c, y, line);
+		for (i = 0; i < wimg; ++i, ++data, ++buff) {
+			if (*data > line[i] * 2) {
+				*buff = convolve(i, j, mask, width, height);
+				++n;
+			}
+		}
+	}
+	delete []line;
+	printf ("%d pixels gotten convolved\n", n);
 }
 
 //////////////////////////////////////////////////////////////////////////////
