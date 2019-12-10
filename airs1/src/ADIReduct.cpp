@@ -237,6 +237,15 @@ void ADIReduct::back_make() {
 	image_spline2(nbkh_, nbkw_, bkmean_.get(), d2mean_.get());	// 生成三次样条插值的二阶扰动矩
 	image_spline2(nbkh_, nbkw_, bksig_.get(),  d2sig_.get());
 
+	double *ptr;
+	for (iy = 0, ptr = d2sig_.get(); iy < nbkh_; ++iy) {
+		for (ix = 0; ix < nbkw_; ++ix, ++ptr) {
+			printf("%.1f ", *ptr);
+		}
+		printf("\n");
+	}
+	printf("\n");
+
 #ifdef NDEBUG
 	FILE *fp1 = fopen("back.txt", "w");
 	FILE *fp2 = fopen("sigma.txt", "w");
@@ -542,10 +551,28 @@ bool ADIReduct::load_filter_conv(const string &filepath) {
 }
 
 float ADIReduct::convolve(int x, int y, double *mask, int width, int height) {
-	double sum(0.0);
-	int himg(frame_->hdim), wimg(frame_->wdim);
+ 	int wHalf = width / 2;
+ 	int hHalf = height / 2;
+	int xmin = x - wHalf;
+	int xmax = x + wHalf;
+	int ymin = y - hHalf;
+	int ymax = y + hHalf;
+	int wimg(frame_->wdim), himg(frame_->hdim);
+	if (xmin < 0 || xmax >= wimg || ymin < 0 || ymax >= himg)
+		return frame_->dataimg[y * wimg + x];
 
-	return 0.0;
+	float *data = frame_->dataimg.get() + ymin * wimg + xmin;
+	double sum(0.0);
+	for (y = ymin; y <= ymax; ++y, data += (wimg - width)) {
+		for (x = xmin; x <= xmax; ++x, ++data, ++mask) {
+			sum += (*data * *mask);
+
+			printf ("%6.0f  ", *data);
+		}
+		printf ("\n");
+	}
+	printf("\n");
+	return (float) sum;
 }
 
 void ADIReduct::filter_convolve() {
@@ -556,24 +583,47 @@ void ADIReduct::filter_convolve() {
 	double *mask = foconv_.mask.get();
 	int width = foconv_.width;
 	int height = foconv_.height;
-	int n(0);
 	float *sigma = bksig_.get();
 	float *line = new float[wimg];
 	double *c   = d2sig_.get();
 	double ystep(1.0 / param_->bkh);
 	double y = (ystep - 1.0) * 0.5;
+	double limit, thresh(1.0);
+	int n1(0); // 参与滤波的数量
+	int n2(0); // 滤波后大于3σ的数量
+
+	double smin(1E30), smax(-1E30);
+	int imin, jmin, imax, jmax;
 
 	for (j = 0; j < himg; ++j, y += ystep) {
 		line_splint2(nbkh_, nbkw_, sigma, c, y, line);
-		for (i = 0; i < wimg; ++i, ++data, ++buff) {
-			if (*data > line[i] * 2) {
-				*buff = convolve(i, j, mask, width, height);
-				++n;
+		for (i = 0; i < wimg; ++i) {
+			if (line[i] > smax) {
+				smax = line[i];
+				imax = i;
+				jmax = j;
+			}
+			if (line[i] < smin) {
+				smin = line[i];
+				imin = i;
+				jmin = j;
 			}
 		}
+//		for (i = 0; i < wimg; ++i, ++data, ++buff) {
+//			if (*data > line[i]) {
+//				++n1;
+//				*buff = convolve(i, j, mask, width, height);
+//				if (*buff > line[i] * 3.0) {
+//					printf ("sigma = %.0f\n", line[i]);
+//					++n2;
+//				}
+//				break;
+//			}
+//		}
 	}
 	delete []line;
-	printf ("%d pixels gotten convolved\n", n);
+//	printf ("%d   %d\n", n1, n2);
+	printf ("smin(%4d, %4d) = %.1f, smax(%4d, %4d) = %.1f\n", imin, jmin, smin, imax, jmax, smax);
 }
 
 //////////////////////////////////////////////////////////////////////////////
