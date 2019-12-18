@@ -440,7 +440,7 @@ void ADIReduct::back_filter() {
 				}
 			}
 		}
-		if (fabs(med = qmedian(maskmean, i) - bkmean_[k]) > AMAX) {
+		if (fabs((med = qmedian(maskmean, i)) - bkmean_[k]) > 0.0) {
 			bufmean[k] = med;
 			bufsig[k]  = qmedian(masksig, i);
 		}
