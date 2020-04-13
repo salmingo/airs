@@ -360,7 +360,7 @@ void ADIReduct::back_guess(int *histo, BackGrid &grid) {
 			sig0 += (dpix * i);
 		}
 		med = hihigh < histo ? 0.0 :
-				((hihigh - histo) + 0.5 + (hisum - lowsum) / (2.0 * (*hilow > *hihigh ? *hilow : *hihigh)));
+				((hihigh - histo) + 0.5 + 0.5 * (hisum - lowsum) / (*hilow > *hihigh ? *hilow : *hihigh));
 		if (sum) {
 			mean /= sum;
 			sig0  = sig0 / sum - mean * mean;
@@ -428,19 +428,21 @@ void ADIReduct::back_filter() {
 	if (i) memcpy(bkmean_.get(), bufmean, sizeof(float) * nbk_);
 	// 滤波
 	for (iy = k = 0; iy < nbkh_; ++iy) {
-		if ((py1 = iy - npy) < 0)     py1 = 0;
-		if ((py2 = iy + npy) > nbkh_) py2 = nbkh_;
+		if ((py1 = iy - npy) < 0)      py1 = 0;
+		if ((py2 = iy + npy) >= nbkh_) py2 = nbkh_ - 1;
+		py1 *= nbkw_;
+		py2 *= nbkw_;
 		for (ix = 0; ix < nbkw_; ++ix, ++k) {
-			if ((px1 = ix - npx) < 0)     px1 = 0;
-			if ((px2 = ix + npx) > nbkw_) px2 = nbkw_;
-			for (py = py1, i = 0; py < py2; ++py) {
-				for (px = px1; px < px2; ++px, ++i) {
-					maskmean[i] = bkmean_[i];
-					masksig[i]  = bksig_[i];
+			if ((px1 = ix - npx) < 0)      px1 = 0;
+			if ((px2 = ix + npx) >= nbkw_) px2 = nbkw_ - 1;
+			for (py = py1, i = 0; py <= py2; py += nbkw_) {
+				for (px = px1; px <= px2; ++px, ++i) {
+					maskmean[i] = bkmean_[py + px];
+					masksig[i]  = bksig_[py + px];
 				}
 			}
 		}
-		if (fabs((med = qmedian(maskmean, i)) - bkmean_[k]) > 0.0) {
+		if (fabs((med = qmedian(maskmean, i)) - bkmean_[k]) >= 0.0) {
 			bufmean[k] = med;
 			bufsig[k]  = qmedian(masksig, i);
 		}
