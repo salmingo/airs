@@ -52,7 +52,7 @@ bool ADIReduct::DoIt(ImgFrmPtr frame) {
 		filter_convolve();
 	// 信号提取与聚合
 	// 目标提取与计算
-	printf ("ellapsed: %.1f sec\n", (microsec_clock::local_time() - now).total_microseconds() * 1E-6);
+	printf ("ellapsed: %.3f sec\n", (microsec_clock::local_time() - now).total_microseconds() * 1E-6);
 	return false;
 }
 
@@ -64,7 +64,7 @@ float ADIReduct::qmedian(float *x, int n) {
 	});
 
 	if (n < 2) return *x;
-	return (n & 1 ? x[n / 2] : (x[n / 2 - 1] + x[n / 2]) * 0.5);
+	return (n & 1 ? x[n / 2] : x[n / 2 - 1]);
 }
 
 void ADIReduct::image_spline(int n, float *y, double yp1, double ypn, double *c) {
@@ -236,15 +236,6 @@ void ADIReduct::back_make() {
 	/* 生成图背景和图像背景噪声位图 */
 	image_spline2(nbkh_, nbkw_, bkmean_.get(), d2mean_.get());	// 生成三次样条插值的二阶扰动矩
 	image_spline2(nbkh_, nbkw_, bksig_.get(),  d2sig_.get());
-
-	double *ptr;
-	for (iy = 0, ptr = d2sig_.get(); iy < nbkh_; ++iy) {
-		for (ix = 0; ix < nbkw_; ++ix, ++ptr) {
-			printf("%.1f ", *ptr);
-		}
-		printf("\n");
-	}
-	printf("\n");
 
 #ifdef NDEBUG
 	FILE *fp1 = fopen("back.txt", "w");
@@ -441,10 +432,11 @@ void ADIReduct::back_filter() {
 					masksig[i]  = bksig_[py + px];
 				}
 			}
-		}
-		if (fabs((med = qmedian(maskmean, i)) - bkmean_[k]) >= 0.0) {
-			bufmean[k] = med;
-			bufsig[k]  = qmedian(masksig, i);
+
+			if (fabs((med = qmedian(maskmean, i)) - bkmean_[k]) >= 0.0) {
+				bufmean[k] = med;
+				bufsig[k]  = qmedian(masksig, i);
+			}
 		}
 	}
 	memcpy(bkmean_.get(), bufmean, sizeof(float) * nbk_);
@@ -568,12 +560,8 @@ float ADIReduct::convolve(int x, int y, double *mask, int width, int height) {
 	for (y = ymin; y <= ymax; ++y, data += (wimg - width)) {
 		for (x = xmin; x <= xmax; ++x, ++data, ++mask) {
 			sum += (*data * *mask);
-
-			printf ("%6.0f  ", *data);
 		}
-		printf ("\n");
 	}
-	printf("\n");
 	return (float) sum;
 }
 
@@ -590,42 +578,15 @@ void ADIReduct::filter_convolve() {
 	double *c   = d2sig_.get();
 	double ystep(1.0 / param_->bkh);
 	double y = (ystep - 1.0) * 0.5;
-	double limit, thresh(1.0);
-	int n1(0); // 参与滤波的数量
-	int n2(0); // 滤波后大于3σ的数量
-
-	double smin(1E30), smax(-1E30);
-	int imin, jmin, imax, jmax;
+	double limit(0.0);
 
 	for (j = 0; j < himg; ++j, y += ystep) {
 		line_splint2(nbkh_, nbkw_, sigma, c, y, line);
-		for (i = 0; i < wimg; ++i) {
-			if (line[i] > smax) {
-				smax = line[i];
-				imax = i;
-				jmax = j;
-			}
-			if (line[i] < smin) {
-				smin = line[i];
-				imin = i;
-				jmin = j;
-			}
+		for (i = 0; i < wimg; ++i, ++data, ++buff) {
+			if (*data > limit) *buff = convolve(i, j, mask, width, height);
 		}
-//		for (i = 0; i < wimg; ++i, ++data, ++buff) {
-//			if (*data > line[i]) {
-//				++n1;
-//				*buff = convolve(i, j, mask, width, height);
-//				if (*buff > line[i] * 3.0) {
-//					printf ("sigma = %.0f\n", line[i]);
-//					++n2;
-//				}
-//				break;
-//			}
-//		}
 	}
 	delete []line;
-//	printf ("%d   %d\n", n1, n2);
-	printf ("smin(%4d, %4d) = %.1f, smax(%4d, %4d) = %.1f\n", imin, jmin, smin, imax, jmax, smax);
 }
 
 //////////////////////////////////////////////////////////////////////////////
