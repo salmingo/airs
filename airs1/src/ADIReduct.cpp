@@ -433,7 +433,7 @@ void ADIReduct::back_filter() {
 				}
 			}
 
-			if (fabs((med = qmedian(maskmean, i)) - bkmean_[k]) >= 0.0) {
+			if ((med = qmedian(maskmean, i)) != bkmean_[k]) {
 				bufmean[k] = med;
 				bufsig[k]  = qmedian(masksig, i);
 			}
@@ -465,8 +465,8 @@ void ADIReduct::sub_back() {
 		}
 	}
 	memcpy(frame_->dataimg.get(), databuf_.get(), sizeof(float) * wimg * himg);
-
 	delete []line;
+
 #ifdef NDEBUG
 	remove("subtracted.fit");
 	// 输出减背景后FITS文件
