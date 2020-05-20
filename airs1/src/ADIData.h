@@ -9,11 +9,13 @@
 
 #include <string>
 #include <vector>
+#include <string.h>
 #include <boost/smart_ptr.hpp>
 
 using std::string;
 typedef boost::shared_array<float> fltarr;
 typedef boost::shared_array<double> dblarr;
+typedef boost::shared_array<int> intarr;
 
 /*!
  * @struct Point2f 由二维实数构成的坐标
@@ -36,14 +38,21 @@ typedef struct Point3f {
  * @struct ObjectInfo 星状目标的测量信息
  */
 struct ObjectInfo {
+	int npix;			//< 像素数
 	/* 图像测量结果 */
 	PT2F ptpeak;		//< 峰值位置
 	PT2F ptbc;			//< 质心
-	double flux;		//< 流量: 归算到1秒曝光时间
+	double xsum, ysum;	//< 加权和
+	double xxsum, xysum, yysum;	//< 加权和
+	double flux;		//< 流量. sum(v)
 	double mag_img;		//< 星等
 	double fwhm;		//< FWHM
 	double ellip;		//< 椭率
 	double snr;			//< 信噪比
+	double slope;		//< 线型的斜率
+	int shape;			//< 形状. -1: 未知; 0: 圆; 1: 椭圆; 2: 线
+	int lnlen;			//< 线型的长度
+	int lnwid;			//< 线型的宽度
 	/* 天文定位结果 */
 	/*!
 	 * @var (ra_inst, dec_inst) 赤道坐标, J2000

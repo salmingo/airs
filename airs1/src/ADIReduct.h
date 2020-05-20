@@ -60,6 +60,9 @@ protected:
 	dblarr d2sig_;		//< 缓存区: 网格噪声二元三次样条二阶扰动矩, Y方向快速变化样条插值系数矩阵
 	FilterConv foconv_;	//< 卷积滤波
 
+	int lastid_;		//< 疑似目标的最大标记
+	intarr flagmap_;	//< 疑似目标标记位图
+
 public:
 	/*!
 	 * @brief 处理图像, 并提取识别图像中的聚合目标
@@ -183,6 +186,24 @@ protected:
 	 * @brief 减去背景, 用于信号提取
 	 */
 	void sub_back();
+	/*!
+	 * @brief 使用8连通域, 聚合疑似目标
+	 * @note
+	 * 扫描滤波后全图, 为8连通域像素建立标记
+	 */
+	void init_glob();
+	/*!
+	 * @brief 估算init_glob()聚合的疑似目标, 为精确测量建立依据
+	 * @note
+	 * 评估重要信息:
+	 * 1. 像素数
+	 * 2. 质心
+	 * 2. 信噪比
+	 * 4. 半高全宽
+	 * 5. 形状
+	 * 6. 区域
+	 */
+	void group_glob();
 };
 
 typedef boost::shared_ptr<ADIReduct> ADIReductPtr;

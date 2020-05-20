@@ -36,6 +36,7 @@ ADIReduct::ADIReduct(Parameter *param)
 	nbkw_   = nbkh_ = 0;
 	nbk_    = 0;
 	stephisto_ = sqrt(2.0 / API) * nsigma_ / cntmin_;
+	lastid_ = 0;
 }
 
 ADIReduct::~ADIReduct() {
@@ -51,6 +52,8 @@ bool ADIReduct::DoIt(ImgFrmPtr frame) {
 	if (param_->ufo && load_filter_conv(param_->pathfo))
 		filter_convolve();
 	// 信号提取与聚合
+	init_glob();
+	group_glob();
 	// 目标提取与计算
 	printf ("ellapsed: %.3f sec\n", (microsec_clock::local_time() - now).total_microseconds() * 1E-6);
 	return false;
@@ -583,10 +586,23 @@ void ADIReduct::filter_convolve() {
 	for (j = 0; j < himg; ++j, y += ystep) {
 		line_splint2(nbkh_, nbkw_, sigma, c, y, line);
 		for (i = 0; i < wimg; ++i, ++data, ++buff) {
-			if (*data > limit) *buff = convolve(i, j, mask, width, height);
+			*buff = convolve(i, j, mask, width, height);
 		}
 	}
 	delete []line;
+}
+
+void ADIReduct::init_glob() {
+	float *buff = databuf_.get();
+	int himg(frame_->hdim), wimg(frame_->wdim), i, j;
+
+	lastid_ = 0;
+	flagmap_.reset(new int[pixels_]);
+
+}
+
+void ADIReduct::group_glob() {
+
 }
 
 //////////////////////////////////////////////////////////////////////////////
