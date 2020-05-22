@@ -40,7 +40,7 @@ typedef struct Point3f {
 struct ObjectInfo {
 	int npix;			//< 像素数
 	/* 图像测量结果 */
-	PT2F ptpeak;		//< 峰值位置
+//	PT2F ptpeak;		//< 峰值位置
 	PT2F ptbc;			//< 质心
 	double xsum, ysum;	//< 加权和
 	double xxsum, xysum, yysum;	//< 加权和
@@ -81,6 +81,16 @@ struct ObjectInfo {
 	 */
 	double mag_cat[5];	//< 星等: 星表
 	double mag_fit[5];	//< 星等: 拟合
+
+public:
+	ObjectInfo() {
+		memset(this, 0, sizeof(ObjectInfo));
+	}
+
+	ObjectInfo &operator=(const ObjectInfo &other) {
+		if (this != &other) memcpy(this, &other, sizeof(ObjectInfo));
+		return *this;
+	}
 };
 typedef std::vector<ObjectInfo> NFObjVector;
 

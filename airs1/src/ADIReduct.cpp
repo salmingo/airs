@@ -53,8 +53,9 @@ bool ADIReduct::DoIt(ImgFrmPtr frame) {
 		filter_convolve();
 	// 信号提取与聚合
 	init_glob();
-	group_glob();
+	if (lastid_) group_glob();
 	// 目标提取与计算
+
 	printf ("ellapsed: %.3f sec\n", (microsec_clock::local_time() - now).total_microseconds() * 1E-6);
 	return false;
 }
@@ -576,33 +577,92 @@ void ADIReduct::filter_convolve() {
 	double *mask = foconv_.mask.get();
 	int width = foconv_.width;
 	int height = foconv_.height;
-	float *sigma = bksig_.get();
-	float *line = new float[wimg];
-	double *c   = d2sig_.get();
-	double ystep(1.0 / param_->bkh);
-	double y = (ystep - 1.0) * 0.5;
-	double limit(0.0);
 
-	for (j = 0; j < himg; ++j, y += ystep) {
-		line_splint2(nbkh_, nbkw_, sigma, c, y, line);
+	for (j = 0; j < himg; ++j) {
 		for (i = 0; i < wimg; ++i, ++data, ++buff) {
 			*buff = convolve(i, j, mask, width, height);
 		}
 	}
-	delete []line;
+}
+
+int ADIReduct::update_label(int x, int y, int w, int h) {
+	int xb = x - 1;
+	int xe = x + 1;
+	int yb = y - 1;
+	int *flagptr = flagmap_.get() + y * w + x;
+
+	if (xb < 0)  xb = 0;
+	if (xe >= w) xe = w - 1;
+	if (yb < 0)  yb = 0;
+
+	if (xb != x && *(flagptr - 1) > 0) return *(flagptr - 1);
+	if (yb != y) {
+		flagptr -= (w + (x - xb));
+		for (x = xb; x <= xe; ++x, ++flagptr) {
+			if (*flagptr > 0) return *flagptr;
+		}
+	}
+
+	return ++lastid_;
 }
 
 void ADIReduct::init_glob() {
-	float *buff = databuf_.get();
 	int himg(frame_->hdim), wimg(frame_->wdim), i, j;
+	float *data = databuf_.get();
+	float *sig = bksig_.get();
+	float *line = new float[wimg];
+	double *c  = d2sig_.get();
+	double ystep(1.0 / param_->bkh);
+	double y = (ystep - 1.0) * 0.5;
+	double t(1.5);
+	int *flagptr;
 
 	lastid_ = 0;
 	flagmap_.reset(new int[pixels_]);
+	flagptr = flagmap_.get();
 
+	for (j = 0; j < himg; ++j, y += ystep) {
+		line_splint2(nbkh_, nbkw_, sig, c, y, line);
+		for (i = 0; i < wimg; ++i, ++data, ++flagptr) {
+			if (*data > t * line[i]) {// ADU大于阈值, 参与聚合候选体
+				*flagptr = update_label(i, j, wimg, himg);
+			}
+		}
+	}
+	delete []line;
+#ifdef NDEBUG
+	printf ("lastid = %d\n", lastid_);
+#endif
 }
 
 void ADIReduct::group_glob() {
+	NFObjVector cans(lastid_);	// 候选体集合
+	ObjectInfo *can;	// 候选体指针
+	int himg(frame_->hdim), wimg(frame_->wdim), i, j;
+	float *data = frame_->dataimg.get();	// 使用原始数据聚合候选体 ???
+	int *flag = flagmap_.get();
+	// 1: 聚合, 初步评估
+	for (j = 0; j < himg; ++j) {
+		for (i = 0; i < wimg; ++i, ++flag, ++data) {
+			if (*flag) {
+				can = &cans[*flag];
 
+				++can->npix;
+				can->flux += *data;
+				can->xsum += (*data * i);
+				can->ysum += (*data * j);
+				can->xxsum += (*data * i * i);
+				can->xysum += (*data * i * j);
+				can->yysum += (*data * j * j);
+			}
+		}
+	}
+	// 2: 统计评估结果
+	for (i = 0; i < lastid_; ++i) {
+		can = &cans[i];
+		can->ptbc.x1 = can->xsum / can->flux;
+		can->ptbc.x2 = can->ysum / can->flux;
+	}
 }
 
 //////////////////////////////////////////////////////////////////////////////

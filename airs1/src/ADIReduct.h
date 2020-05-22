@@ -204,6 +204,21 @@ protected:
 	 * 6. 区域
 	 */
 	void group_glob();
+	/*!
+	 * @brief 计算像素点位置的候选体标签
+	 * @param x  X坐标
+	 * @param y  Y坐标
+	 * @param w  图像宽度
+	 * @param h  图像高度
+	 * @return
+	 * 该像素点的标签
+	 * @note
+	 * - 使用8连通域计算像素点的标签
+	 * - 顺序扫描该像素左侧、左上、正上、右上四个像素
+	 * - 若上述4像素任意一个已经标记, 则本像素继承已标记点的标签, 并中止扫描
+	 * - 若上述4像素都没有标记, 则本像素取lastid_ + 1
+	 */
+	int update_label(int x, int y, int w, int h);
 };
 
 typedef boost::shared_ptr<ADIReduct> ADIReductPtr;
