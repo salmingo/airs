@@ -801,7 +801,7 @@ void ADIReduct::group_glob() {
 		if (!can->flag && can->npix) frame_->nfobj[j++] = *can;
 	}
 
-//#ifdef NDEBUG
+#ifdef NDEBUG
 	// 输出评估结果
 	FILE *fp = fopen("cans.txt", "w");
 	double dx, dy;
@@ -829,7 +829,7 @@ void ADIReduct::group_glob() {
 	}
 	fclose(fp);
 	printf ("lastid = %d, nobjs = %d\n", lastid_, frame_->nobjs);
-//#endif
+#endif
 
 	// 7: 释放临时资源
 	cans.clear();
