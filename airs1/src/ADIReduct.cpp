@@ -217,6 +217,9 @@ float ADIReduct::pixel_splint2(int m, int n, float y[], double c[], double line,
 	for (i =0; i < n; ++i, ++low, ++high, ++dlow, ++dhigh) {
 		yx2[i] = a * *low + b * *high + a3 * *dlow + b3 * *dhigh;
 	}
+	image_spline(n, yx2, 1E30, 1E30, cx2);
+	rslt = float(image_splint(n, yx2, cx2, col));
+	delete []yx2;
 	delete []cx2;
 
 	return rslt;
