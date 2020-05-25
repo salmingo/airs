@@ -47,6 +47,7 @@ bool ADIReduct::DoIt(ImgFrmPtr frame) {
 	ptime now = microsec_clock::local_time();
 	frame_ = frame;
 	alloc_buffer();
+	scan_image();	// 扫描全图, 修复overscan区和/或prescan区
 	back_make();
 	sub_back();
 	if (param_->ufo && load_filter_conv(param_->pathfo))
@@ -68,7 +69,7 @@ float ADIReduct::qmedian(float *x, int n) {
 	});
 
 	if (n < 2) return *x;
-	return (n & 1 ? x[n / 2] : x[n / 2 - 1]);
+	return (n & 1 ? x[n / 2] : (x[n / 2 - 1] + x[n / 2]) * 0.5);
 }
 
 void ADIReduct::image_spline(int n, float *y, double yp1, double ypn, double *c) {
@@ -189,6 +190,38 @@ void ADIReduct::line_splint2(int m, int n, float y[], double c[], double line, f
 	delete []cx2;
 }
 
+float ADIReduct::pixel_splint2(int m, int n, float y[], double c[], double line, double col) {
+	// 将(col, line)转换为网格坐标系
+	line = (line + 0.5) / param_->bkh - 0.5;
+	col  = (col + 0.5) / param_->bkw - 0.5;
+	// 二元三次样条插值
+	int nx = int(line);
+	int i;
+	float rslt;
+	float *low, *high;
+	float *yx2  = new float[n];		// 参与计算X轴扰动量的拟合值
+	double *cx2 = new double[n];
+	double *dlow, *dhigh;
+	double a, b, a3, b3;
+
+	if (nx == (m - 1)) --nx;
+	b = line - nx;
+	a = 1.0 - b;
+	a3 = a * (a * a - 1.0) / 6.0;
+	b3 = b * (b * b - 1.0) / 6.0;
+	low   = y + nx * n;
+	high  = low + n;
+	dlow  = c + nx * n;
+	dhigh = dlow + n;
+
+	for (i =0; i < n; ++i, ++low, ++high, ++dlow, ++dhigh) {
+		yx2[i] = a * *low + b * *high + a3 * *dlow + b3 * *dhigh;
+	}
+	delete []cx2;
+
+	return rslt;
+}
+
 void ADIReduct::alloc_buffer() {
 	if (!(pixels_ == frame_->pixels && databuf_.unique())) {
 		pixels_ = frame_->pixels;
@@ -207,6 +240,26 @@ void ADIReduct::alloc_buffer() {
 		d2sig_.reset   (new double[nbk_]);
 	}
 	if (!foconv_.mask.unique()) foconv_.mask.reset(new double[nmaxfo_]);
+}
+
+void ADIReduct::scan_image() {
+	double mea(0.0), sig(0.0);
+	float *data = frame_->dataimg.get();
+	float t;
+	int i;
+
+	for (i = 0; i < pixels_; ++i, ++data) {
+		mea += *data;
+		sig += (*data * *data);
+	}
+	mea /= pixels_;
+	sig = sqrt(sig / pixels_ - mea * mea);
+	t = float(mea - sig * 3.0);
+
+	data = frame_->dataimg.get();
+	for (i = 0; i < pixels_; ++i, ++data) {
+		if (*data <= t) *data = -AMAX;
+	}
 }
 
 void ADIReduct::back_make() {
@@ -465,7 +518,8 @@ void ADIReduct::sub_back() {
 	for (j = 0; j < himg; ++j, y += ystep) {
 		line_splint2(nbkh_, nbkw_, mean, c, y, line);
 		for (i = 0; i < wimg; ++i, ++buff, ++data) {
-			*buff = *data - line[i];
+			if (*data <= -AMAX) *data = 0.0;
+			else *buff = *data - line[i];
 		}
 	}
 	memcpy(frame_->dataimg.get(), databuf_.get(), sizeof(float) * wimg * himg);
@@ -585,25 +639,49 @@ void ADIReduct::filter_convolve() {
 	}
 }
 
-int ADIReduct::update_label(int x, int y, int w, int h) {
+int ADIReduct::init_label(int x, int y, int w, int h) {
 	int xb = x - 1;
 	int xe = x + 1;
 	int yb = y - 1;
-	int *flagptr = flagmap_.get() + y * w + x;
+	int *flagptr;
 
 	if (xb < 0)  xb = 0;
 	if (xe >= w) xe = w - 1;
 	if (yb < 0)  yb = 0;
 
-	if (xb != x && *(flagptr - 1) > 0) return *(flagptr - 1);
 	if (yb != y) {
-		flagptr -= (w + (x - xb));
+		flagptr = flagmap_.get() + yb * w + xb;
 		for (x = xb; x <= xe; ++x, ++flagptr) {
 			if (*flagptr > 0) return *flagptr;
 		}
 	}
+	if (xb != x) {
+		flagptr = flagmap_.get() + y * w + xb;
+		if (*flagptr > 0) return *flagptr;
+	}
 
 	return ++lastid_;
+}
+
+int ADIReduct::minimum_label(int x, int y, int w, int h) {
+	int xb = x - 1;
+	int xe = x + 1;
+	int yb = y - 1;
+	int ye = y;
+	int *ptr;
+	int l, lmin(INT_MAX);
+
+	if (xb < 0)  xb = 0;
+	if (xe >= w) xe = w - 1;
+	if (yb < 0)  yb = 0;
+
+	for (y = yb, ptr = flagmap_.get() + yb * w; y <= ye; ++y, ptr += w) {
+		for (x = xb; x <= xe; ++x) {
+			if ((l = ptr[x]) > 0 && l < lmin) lmin = l;
+		}
+	}
+
+	return lmin;
 }
 
 void ADIReduct::init_glob() {
@@ -614,9 +692,10 @@ void ADIReduct::init_glob() {
 	double *c  = d2sig_.get();
 	double ystep(1.0 / param_->bkh);
 	double y = (ystep - 1.0) * 0.5;
-	double t(1.5);
+	double t(param_->snrp);
 	int *flagptr;
 
+	if (t < 1.5) t = 1.5;	// 最小置信值
 	lastid_ = 0;
 	flagmap_.reset(new int[pixels_]);
 	flagptr = flagmap_.get();
@@ -625,44 +704,135 @@ void ADIReduct::init_glob() {
 		line_splint2(nbkh_, nbkw_, sig, c, y, line);
 		for (i = 0; i < wimg; ++i, ++data, ++flagptr) {
 			if (*data > t * line[i]) {// ADU大于阈值, 参与聚合候选体
-				*flagptr = update_label(i, j, wimg, himg);
+				*flagptr = init_label(i, j, wimg, himg);
 			}
 		}
 	}
 	delete []line;
-#ifdef NDEBUG
-	printf ("lastid = %d\n", lastid_);
-#endif
 }
 
 void ADIReduct::group_glob() {
-	NFObjVector cans(lastid_);	// 候选体集合
+	NFObjVector cans(lastid_ + 1);	// 候选体集合
 	ObjectInfo *can;	// 候选体指针
 	int himg(frame_->hdim), wimg(frame_->wdim), i, j;
 	float *data = frame_->dataimg.get();	// 使用原始数据聚合候选体 ???
 	int *flag = flagmap_.get();
+	Point3f pt;
 	// 1: 聚合, 初步评估
 	for (j = 0; j < himg; ++j) {
+		pt.y = j;
 		for (i = 0; i < wimg; ++i, ++flag, ++data) {
 			if (*flag) {
+				pt.x = i;
+				pt.z = *data;
 				can = &cans[*flag];
-
-				++can->npix;
-				can->flux += *data;
-				can->xsum += (*data * i);
-				can->ysum += (*data * j);
-				can->xxsum += (*data * i * i);
-				can->xysum += (*data * i * j);
-				can->yysum += (*data * j * j);
+				can->AddPoint(pt);
 			}
 		}
 	}
-	// 2: 统计评估结果
-	for (i = 0; i < lastid_; ++i) {
-		can = &cans[i];
-		can->ptbc.x1 = can->xsum / can->flux;
-		can->ptbc.x2 = can->ysum / can->flux;
+
+	// 2: 剔除假信号
+	if (param_->ucs) {// 单像素点或流量异常点, 判定为热点或假信号
+		for (i = 1; i <= lastid_; ++i) {
+			can = &cans[i];
+			if (can->ptpeak.z >= can->flux) can->npix = 0;
+		}
 	}
+
+	// 3: 聚合被分割的单一星像
+	int *labels = new int[lastid_ + 1];
+	int lmin, l0, l1;
+
+	for (i = 1; i <= lastid_; ++i) labels[i] = i;
+	for (j = 0, flag = flagmap_.get(); j < himg; ++j) {
+		for (i = 0; i < wimg; ++i, ++flag) {
+			if ((l0 = *flag) && cans[l0].npix) {// 忽略未标记像素\"坏"像素\已合并候选体
+				// 计算像素临近点的最小标签
+				lmin = minimum_label(i, j, wimg, himg);
+				while ((l1 = labels[lmin]) < lmin) lmin = l1;
+				if (l0 != lmin) {// 合并候选体
+					*flag      = lmin;
+					labels[l0] = lmin;		// 重定向标签
+					if (!cans[l0].flag) {
+						cans[lmin] += cans[l0];	// 合并候选体
+						cans[l0].flag = true;	// 设置合并标记
+					}
+				}
+			}
+		}
+	}
+
+	// 4: 重新打标签
+	for (j = 0, flag = flagmap_.get(); j < himg; ++j) {
+		for (i = 0; i < wimg; ++i, ++flag) {
+			if ((l0 = *flag) && cans[l0].npix && cans[l0].flag) {
+				*flag = labels[l0];
+			}
+		}
+	}
+
+	delete []labels;
+	// 5: 依据阈值, 剔除不符合条件的目标
+	double snr, sig;
+	for (i = 1, j = 0, can = &cans[1]; i <= lastid_; ++i, ++can) {
+		if (can->npix == 0 || can->flag) continue;
+		if ((param_->area0 && can->npix < param_->area0)
+			|| (param_->area1 && can->npix > param_->area1))
+			can->npix = 0;
+		else {// 粗略计算目标特征
+			sig = pixel_splint2(nbkh_, nbkw_, bksig_.get(), d2sig_.get(), can->ptbc.y, can->ptbc.x);
+			snr = can->flux / sig / sqrt(can->npix * 1.0);
+			if (snr < param_->snrp)
+				can->npix = 0;
+			else {
+				can->back = pixel_splint2(nbkh_, nbkw_, bkmean_.get(), d2mean_.get(), can->ptbc.y, can->ptbc.x);
+				can->sig  = sig;
+				can->snr  = snr;
+				can->UpdateCenter();
+
+				++j; // 有效目标数量
+			}
+		}
+	}
+
+	// 6: 存储目标识别结果
+	frame_->UpdateNumberObject(j);
+	for (i = 1, j = 0, can = &cans[1]; i <= lastid_; ++i, ++can) {
+		if (!can->flag && can->npix) frame_->nfobj[j++] = *can;
+	}
+
+//#ifdef NDEBUG
+	// 输出评估结果
+	FILE *fp = fopen("cans.txt", "w");
+	double dx, dy;
+
+	fprintf (fp, "%6s %6s %6s %6s | %5s %5s | %5s %5s %2s %5s %5s | %4s | %5s | %7s\n",
+			"X.Cent", "Y.Cent", "X.Peak", "Y.Peak", "X.C-P", "Y.C-P",
+			"X.Min", "Y.Min"," ", "X.Max", "Y.Max",
+			"NPix",
+			"SNR",
+			"Flux");
+	for (i = 0, can = &frame_->nfobj[0]; i < frame_->nobjs; ++i, ++can) {
+		dx = can->ptbc.x - can->ptpeak.x;
+		dy = can->ptbc.y - can->ptpeak.y;
+
+		fprintf (fp, "%6.1f %6.1f %6.0f %6.0f | %5.1f %5.1f | [%4d %4d] => [%4d %4d] | %4d | %5.1f | %7.0f",
+				can->ptbc.x, can->ptbc.y,
+				can->ptpeak.x, can->ptpeak.y,
+				dx, dy,
+				can->xmin, can->ymin, can->xmax, can->ymax,
+				can->npix,
+				can->snr,
+				can->flux);
+		if (dx > 2.0 || dx < -2.0 || dy > 2.0 || dy < -2.0) fprintf(fp,"  ******");
+		fprintf (fp, "\n");
+	}
+	fclose(fp);
+	printf ("lastid = %d, nobjs = %d\n", lastid_, frame_->nobjs);
+//#endif
+
+	// 7: 释放临时资源
+	cans.clear();
 }
 
 //////////////////////////////////////////////////////////////////////////////

@@ -21,27 +21,38 @@ typedef boost::shared_array<int> intarr;
  * @struct Point2f 由二维实数构成的坐标
  */
 typedef struct Point2f {
-	double x1;
-	double x2;
+	double x;
+	double y;
 }PT2F, * PPT2F;
 
 /*!
  * @struct Point3f 由三维实数构成的坐标
  */
 typedef struct Point3f {
-	double x1;
-	double x2;
-	double x3;
+	double x;
+	double y;
+	double z;
+
+public:
+	Point3f &operator=(const Point3f &other) {
+		if (this != &other) memcpy(this, &other, sizeof(Point3f));
+		return *this;
+	}
 }PT3F, * PPT3F;
 
 /*!
  * @struct ObjectInfo 星状目标的测量信息
  */
 struct ObjectInfo {
+	bool flag;			//< false: 初始构建; true: 被合并进入其它候选体
 	int npix;			//< 像素数
+	int xmin, ymin;		//< 构成目标的坐标: 最小值
+	int xmax, ymax;		//< 构成目标的坐标: 最大值
 	/* 图像测量结果 */
-//	PT2F ptpeak;		//< 峰值位置
+	PT3F ptpeak;		//< 峰值位置
 	PT2F ptbc;			//< 质心
+	float back;			//< 质心的统计背景
+	float sig;			//< 质心的统计噪声
 	double xsum, ysum;	//< 加权和
 	double xxsum, xysum, yysum;	//< 加权和
 	double flux;		//< 流量. sum(v)
@@ -85,11 +96,66 @@ struct ObjectInfo {
 public:
 	ObjectInfo() {
 		memset(this, 0, sizeof(ObjectInfo));
+		xmin = ymin = INT_MAX;
+		xmax = ymax = -1;
 	}
 
 	ObjectInfo &operator=(const ObjectInfo &other) {
 		if (this != &other) memcpy(this, &other, sizeof(ObjectInfo));
 		return *this;
+	}
+
+	/*!
+	 * @brief 合并两个候选体
+	 */
+	ObjectInfo &operator+=(const ObjectInfo &other) {
+		if (this != &other) {
+			npix += other.npix;
+			flux += other.flux;
+			xsum += other.xsum;
+			ysum += other.ysum;
+			xxsum += other.xxsum;
+			xysum += other.xysum;
+			yysum += other.yysum;
+			if (xmin > other.xmin) xmin = other.xmin;
+			if (xmax < other.xmax) xmax = other.xmax;
+			if (ymin > other.ymin) ymin = other.ymin;
+			if (ymax < other.ymax) ymax = other.ymax;
+			if (ptpeak.z < other.ptpeak.z) ptpeak = other.ptpeak;
+		}
+
+		return *this;
+	}
+
+	void AddPoint(const Point3f &pt) {
+		int x = int(pt.x + 0.5);
+		int y = int(pt.y + 0.5);
+		double z = pt.z;
+		double zx = z * x;
+		double zy = z * y;
+
+		++npix;
+		flux += z;
+		xsum += zx;
+		ysum += zy;
+		xxsum += (zx * x);
+		xysum += (zx * y);
+		yysum += (zy * y);
+
+		if (xmin > x) xmin = x;
+		if (xmax < x) xmax = x;
+		if (ymin > y) ymin = y;
+		if (ymax < y) ymax = y;
+		if (z > ptpeak.z) {
+			ptpeak.x = x;
+			ptpeak.y = y;
+			ptpeak.z = z;
+		}
+	}
+
+	void UpdateCenter() {
+		ptbc.x = xsum / flux;
+		ptbc.y = ysum / flux;
 	}
 };
 typedef std::vector<ObjectInfo> NFObjVector;
@@ -108,6 +174,7 @@ struct ImageFrame {
 	/* 过程数据 */
 	fltarr dataimg;		//< 缓存区: 原始图像数据
 	/* 处理结果 */
+	int nobjs;			//< 目标数量
 	NFObjVector nfobj;	//< 星状目标信息集合
 	PT2F eqc;			//< 赤道坐标: 中心指向位置, J2000
 
@@ -138,6 +205,7 @@ public:
 	 */
 	bool UpdateNumberObject(int n) {
 		if (nfobj.size() < n) nfobj.resize(n);
+		nobjs = n;
 		return (nfobj.size() >= n);
 	}
 };

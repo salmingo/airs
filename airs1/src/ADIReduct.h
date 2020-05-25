@@ -129,6 +129,16 @@ protected:
 	 */
 	void line_splint2(int m, int n, float y[], double c[], double line, float yx[]);
 	/*!
+	 * @brief 使用二元三次样条插值, 计算像素位置的插值
+	 * @param m     慢速自变量数组长度
+	 * @param n     快速自变量数组长度
+	 * @param y     样本: 因变量数组, m*n数组, 指向bkmean_或bksig_
+	 * @param c     内插系数拟合结果, n*m数组, 列优先存储, 指向d2mean_或d2sig_
+	 * @param line  行编号, 对应图像中Y轴
+	 * @param col   列编号, 对应图像中X轴
+	 */
+	float pixel_splint2(int m, int n, float y[], double c[], double line, double col);
+	/*!
 	 * @brief 加载卷积滤波核
 	 * @param filename 文件名
 	 * @return
@@ -157,6 +167,12 @@ protected:
 	 * @brief 生成缓存区
 	 */
 	void alloc_buffer();
+	/*!
+	 * @brief 扫描全图, 修正带overscan或/和prescan区的图像
+	 * @note
+	 * overscan和prescan区数值等效于BIAS, 对图像拟合造成干扰
+	 */
+	void scan_image();
 	/*!
 	 * @brief 生成背景
 	 */
@@ -205,7 +221,7 @@ protected:
 	 */
 	void group_glob();
 	/*!
-	 * @brief 计算像素点位置的候选体标签
+	 * @brief 计算像素点的候选体标签
 	 * @param x  X坐标
 	 * @param y  Y坐标
 	 * @param w  图像宽度
@@ -218,7 +234,17 @@ protected:
 	 * - 若上述4像素任意一个已经标记, 则本像素继承已标记点的标签, 并中止扫描
 	 * - 若上述4像素都没有标记, 则本像素取lastid_ + 1
 	 */
-	int update_label(int x, int y, int w, int h);
+	int init_label(int x, int y, int w, int h);
+	/*!
+	 * @brief 查找像素点8连通域的最小标签
+	 * @param x  X坐标
+	 * @param y  Y坐标
+	 * @param w  图像宽度
+	 * @param h  图像高度
+	 * @return
+	 * 该像素点8连通域的最小标签
+	 */
+	int minimum_label(int x, int y, int w, int h);
 };
 
 typedef boost::shared_ptr<ADIReduct> ADIReductPtr;
