@@ -695,10 +695,9 @@ void ADIReduct::init_glob() {
 	double *c  = d2sig_.get();
 	double ystep(1.0 / param_->bkh);
 	double y = (ystep - 1.0) * 0.5;
-	double t(param_->snrp);
+	double t(1.5);
 	int *flagptr;
 
-	if (t < 1.5) t = 1.5;	// 最小置信值
 	lastid_ = 0;
 	flagmap_.reset(new int[pixels_]);
 	flagptr = flagmap_.get();
@@ -706,7 +705,7 @@ void ADIReduct::init_glob() {
 	for (j = 0; j < himg; ++j, y += ystep) {
 		line_splint2(nbkh_, nbkw_, sig, c, y, line);
 		for (i = 0; i < wimg; ++i, ++data, ++flagptr) {
-			if (*data > t * line[i]) {// ADU大于阈值, 参与聚合候选体
+			if (*data >= t * line[i]) {// ADU大于阈值, 参与聚合候选体
 				*flagptr = init_label(i, j, wimg, himg);
 			}
 		}
@@ -766,12 +765,19 @@ void ADIReduct::group_glob() {
 	}
 
 	// 4: 重新打标签
+//	int cnt(0);
 	for (j = 0, flag = flagmap_.get(); j < himg; ++j) {
+//		cnt = 0;
 		for (i = 0; i < wimg; ++i, ++flag) {
 			if ((l0 = *flag) && cans[l0].npix && cans[l0].flag) {
 				*flag = labels[l0];
 			}
+//			if (i >= 685 && i <= 704 && j >= 2849 && j <= 3030) {
+//				printf ("%4d ", *flag);
+//				++cnt;
+//			}
 		}
+//		if (cnt) printf ("\n");
 	}
 
 	delete []labels;
@@ -827,7 +833,7 @@ void ADIReduct::group_glob() {
 				can->npix,
 				can->snr,
 				can->flux);
-		if (dx > 2.0 || dx < -2.0 || dy > 2.0 || dy < -2.0) fprintf(fp,"  ******");
+		if (dx > 1.0 || dx < -1.0 || dy > 1.0 || dy < -1.0) fprintf(fp,"  ******");
 		fprintf (fp, "\n");
 	}
 	fclose(fp);
