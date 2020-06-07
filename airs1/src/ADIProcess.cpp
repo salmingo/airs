@@ -38,7 +38,7 @@ bool ADIProcess::SetImage(const string &filepath) {
 	fits_read_key(fitsptr, TSTRING, "DATE-OBS", dateobs,  NULL, &status);
 	if (!(datefull = NULL != strstr(dateobs, "T")))
 		fits_read_key(fitsptr, TSTRING, "TIME-OBS", timeobs,  NULL, &status);
-	fits_read_key(fitsptr, TDOUBLE, "EXPTIME",  &frmptr_->expdur, NULL, &status);
+	fits_read_key(fitsptr, TDOUBLE, "EXPOSURE",  &frmptr_->expdur, NULL, &status);
 	frmptr_->AllocBuffer();
 	fits_read_img(fitsptr, TFLOAT, 1, frmptr_->pixels, NULL, frmptr_->dataimg.get(), NULL, &status);
 	fits_close_file(fitsptr, &status);

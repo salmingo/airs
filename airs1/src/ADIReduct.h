@@ -245,6 +245,28 @@ protected:
 	 * 该像素点8连通域的最小标签
 	 */
 	int minimum_label(int x, int y, int w, int h);
+	/*!
+	 * @brief 评估候选体星像形状
+	 * @return
+	 * 形状异常标志
+	 */
+	bool shape_clip(ObjectInfo &obj);
+	/*!
+	 * @brief 评估候选体星像质量
+	 */
+	void stat_quality();
+	/*!
+	 * @brief 评估候选体星像的质心与峰值偏差
+	 * @return
+	 * 星像质量
+	 */
+	double quality_center_bias(ObjectInfo &obj);
+	/*!
+	 * @brief 评估候选体星像的饱和度
+	 * @return
+	 * 星像质量
+	 */
+	double quality_saturation(ObjectInfo &obj);
 };
 
 typedef boost::shared_ptr<ADIReduct> ADIReductPtr;

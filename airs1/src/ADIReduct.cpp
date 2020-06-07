@@ -55,6 +55,8 @@ bool ADIReduct::DoIt(ImgFrmPtr frame) {
 	// 信号提取与聚合
 	init_glob();
 	if (lastid_) group_glob();
+	// 评估星像质量
+	stat_quality();
 	// 目标提取与计算
 
 	printf ("ellapsed: %.3f sec\n", (microsec_clock::local_time() - now).total_microseconds() * 1E-6);
@@ -687,6 +689,27 @@ int ADIReduct::minimum_label(int x, int y, int w, int h) {
 	return lmin;
 }
 
+bool ADIReduct::shape_clip(ObjectInfo &obj) {
+	double x2 = obj.xxsum / obj.flux - obj.ptbc.x * obj.ptbc.x;
+	double y2 = obj.yysum / obj.flux - obj.ptbc.y * obj.ptbc.y;
+	double xy = obj.xysum / obj.flux - obj.ptbc.x * obj.ptbc.y;
+	double theta = 0.5 * atan2(xy, x2 - y2);
+	double t1 = 0.5 * (x2 + y2);
+	double t2 = sqrt(0.25 * (x2 - y2) * (x2-y2) + xy *xy);
+	double A2 = t1 + t2;
+	double B2 = t1 - t2;
+
+	if (t1 > t2) {
+		obj.slope = theta * R2D;
+		obj.ellip = 1.0 - 1.0 / sqrt(A2 / B2);
+		obj.lnlen = int(sqrt(A2));
+		obj.lnwid = int(sqrt(B2));
+		return false;
+	}
+
+	return true;
+}
+
 void ADIReduct::init_glob() {
 	int himg(frame_->hdim), wimg(frame_->wdim), i, j;
 	float *data = databuf_.get();
@@ -717,7 +740,7 @@ void ADIReduct::group_glob() {
 	NFObjVector cans(lastid_ + 1);	// 候选体集合
 	ObjectInfo *can;	// 候选体指针
 	int himg(frame_->hdim), wimg(frame_->wdim), i, j;
-	float *data = frame_->dataimg.get();	// 使用原始数据聚合候选体 ???
+	float *data = frame_->dataimg.get();	// 使用原始数据聚合候选体
 	int *flag = flagmap_.get();
 	Point3f pt;
 	// 1: 聚合, 初步评估
@@ -765,19 +788,12 @@ void ADIReduct::group_glob() {
 	}
 
 	// 4: 重新打标签
-//	int cnt(0);
 	for (j = 0, flag = flagmap_.get(); j < himg; ++j) {
-//		cnt = 0;
 		for (i = 0; i < wimg; ++i, ++flag) {
 			if ((l0 = *flag) && cans[l0].npix && cans[l0].flag) {
 				*flag = labels[l0];
 			}
-//			if (i >= 685 && i <= 704 && j >= 2849 && j <= 3030) {
-//				printf ("%4d ", *flag);
-//				++cnt;
-//			}
 		}
-//		if (cnt) printf ("\n");
 	}
 
 	delete []labels;
@@ -785,8 +801,11 @@ void ADIReduct::group_glob() {
 	double snr, sig;
 	for (i = 1, j = 0, can = &cans[1]; i <= lastid_; ++i, ++can) {
 		if (can->npix == 0 || can->flag) continue;
-		if ((param_->area0 && can->npix < param_->area0)
-			|| (param_->area1 && can->npix > param_->area1))
+
+		can->UpdateCenter();
+		if ((param_->area0 && can->npix < param_->area0)		// 面积下限
+			|| (param_->area1 && can->npix > param_->area1)		// 面积上限
+			|| shape_clip(*can))	// 基本形状
 			can->npix = 0;
 		else {// 粗略计算目标特征
 			sig = pixel_splint2(nbkh_, nbkw_, bksig_.get(), d2sig_.get(), can->ptbc.y, can->ptbc.x);
@@ -797,7 +816,6 @@ void ADIReduct::group_glob() {
 				can->back = pixel_splint2(nbkh_, nbkw_, bkmean_.get(), d2mean_.get(), can->ptbc.y, can->ptbc.x);
 				can->sig  = sig;
 				can->snr  = snr;
-				can->UpdateCenter();
 
 				++j; // 有效目标数量
 			}
@@ -810,12 +828,15 @@ void ADIReduct::group_glob() {
 		if (!can->flag && can->npix) frame_->nfobj[j++] = *can;
 	}
 
+	// 7: 释放临时资源
+	cans.clear();
+
 #ifdef NDEBUG
 	// 输出评估结果
 	FILE *fp = fopen("cans.txt", "w");
 	double dx, dy;
 
-	fprintf (fp, "%6s %6s %6s %6s | %5s %5s | %5s %5s %2s %5s %5s | %4s | %5s | %7s\n",
+	fprintf (fp, "%7s %7s %6s %6s | %5s %5s | %5s %5s %2s %5s %5s | %4s | %5s | %7s\n",
 			"X.Cent", "Y.Cent", "X.Peak", "Y.Peak", "X.C-P", "Y.C-P",
 			"X.Min", "Y.Min"," ", "X.Max", "Y.Max",
 			"NPix",
@@ -825,7 +846,7 @@ void ADIReduct::group_glob() {
 		dx = can->ptbc.x - can->ptpeak.x;
 		dy = can->ptbc.y - can->ptpeak.y;
 
-		fprintf (fp, "%6.1f %6.1f %6.0f %6.0f | %5.1f %5.1f | [%4d %4d] => [%4d %4d] | %4d | %5.1f | %7.0f",
+		fprintf (fp, "%7.2f %7.2f %6.0f %6.0f | %5.1f %5.1f | [%4d %4d] => [%4d %4d] | %4d | %5.1f | %7.0f",
 				can->ptbc.x, can->ptbc.y,
 				can->ptpeak.x, can->ptpeak.y,
 				dx, dy,
@@ -839,9 +860,83 @@ void ADIReduct::group_glob() {
 	fclose(fp);
 	printf ("lastid = %d, nobjs = %d\n", lastid_, frame_->nobjs);
 #endif
+}
 
-	// 7: 释放临时资源
-	cans.clear();
+void ADIReduct::stat_quality() {
+	ObjectInfo *can = &frame_->nfobj[0];
+	int n = frame_->nobjs;
+	double q1, q2, q3;
+
+	FILE *fp = fopen("quality.txt", "w");
+	for (int i = 0; i < n; ++i, ++can) {
+		q1 = quality_center_bias(*can);
+		q2 = 1.0 / (1.0 - can->ellip);
+		q3 = quality_saturation(*can);
+
+		can->quality = q1 * q2 * q3;
+
+		fprintf (fp, "%6.1f %6.1f %4d %4d | "
+				"%.1f %.1f %.1f => %.1f\n",
+				can->ptbc.x, can->ptbc.y,
+				int(can->ptpeak.x), int(can->ptpeak.y),
+				q1, q2, q3, can->quality);
+	}
+	fclose(fp);
+}
+
+/** 2020-06-02
+ * 星像质量评估: 只有点像参与位置拟合和光度拟合
+ * q = q1 * q2 * q3
+ * - q越大, 质量越差
+ * - q1: 质心与峰值偏差
+ *   q1 = 0.5 * (|dx|+|dy|) + 1
+ * - q2: 形状
+ *   q2 = a / b, a: 长度/半长轴, b: 宽度/半短轴
+ * - q3: 饱和
+ *   q3 = mean / peak, peak是峰值, mean是4连通域的均值
+ *   饱和星像的q3≈1, 非饱和的q3<1
+ *
+ * @note
+ * - 质心与峰值偏差大于1pixel
+ * - 形状:
+ *   1. 拖长(线型: 运动目标; 椭圆: 星系)
+ *   2. 临近双星, 需要分割后使用PSF轮廓拟合、测量
+ * - 饱和
+ */
+double ADIReduct::quality_center_bias(ObjectInfo &obj) {
+	double dx = obj.ptbc.x - obj.ptpeak.x;
+	double dy = obj.ptbc.y - obj.ptpeak.y;
+
+	return (0.5 * (fabs(dx) + fabs(dy)) + 1.0);
+}
+
+double ADIReduct::quality_saturation(ObjectInfo &obj) {
+	int himg(frame_->hdim), wimg(frame_->wdim);
+	int x0 = int(obj.ptpeak.x);
+	int y0 = int(obj.ptpeak.y);
+	int addr = y0 * wimg + x0;
+	int n(0);
+	double vsum(0.0);
+	float *data = frame_->dataimg.get() + addr;
+
+	if (y0 >= 1) {
+		++n;
+		vsum += *(data - wimg);
+	}
+	if (y0 < himg - 1) {
+		++n;
+		vsum += *(data + wimg);
+	}
+	if (x0 >= 1) {
+		++n;
+		vsum += *(data - 1);
+	}
+	if (x0 < himg - 1) {
+		++n;
+		vsum += *(data + 1);
+	}
+
+	return (vsum / obj.ptpeak.z / n + 1.0);
 }
 
 //////////////////////////////////////////////////////////////////////////////

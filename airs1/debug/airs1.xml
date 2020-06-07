@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <version>0.1</version>
-<date>2019-11-27T01:23:22</date>
+<date>2019-11-03T07:08:16</date>
 <Output Path=""/>
 <Preprocess Enable="false">
     <ZERO Path=""/>
@@ -8,15 +8,15 @@
     <FLAT Path=""/>
 </Preprocess>
 <ImageReduct>
-    <BackMesh Size="128"/>
+    <BackMesh Size="64"/>
     <!--<size> or <width>, <height>-->
     <BackFilter Size="3"/>
     <!--<size> or <width>, <height>-->
     <Detect SNR="3"/>
-    <Analysis SNR="5"/>
+    <Analysis SNR="4"/>
     <Area Minimum="3" Maximum="0"/>
     <!--Area.Maximum == 0 means unlimited-->
-    <Filter Enable="false" Filepath=""/>
+    <Filter Enable="true" Filepath="/usr/local/etc/default.conv"/>
     <!--use filter to detect signal-->
     <CleanSpurious Enable="true"/>
 </ImageReduct>

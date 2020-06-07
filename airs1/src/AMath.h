@@ -1,0 +1,82 @@
+/**
+ * @class AMath 一些天文数据处理中使用的数学工具
+ * @version 1.0
+ * @date 2020-06-04
+ * @author Xiaomeng Lu
+ */
+
+#ifndef SRC_AMATH_H_
+#define SRC_AMATH_H_
+
+namespace AstroUtil {
+//////////////////////////////////////////////////////////////////////////////
+class AMath {
+public:
+	AMath();
+	virtual ~AMath();
+
+public:
+	/*!
+	 * @brief 线性最小二乘拟合
+	 * @param m  样本数量
+	 * @param n  基函数数量
+	 * @param x  每个基函数对每个自变量的计算结果, 其数学形式是二维数组.
+	 *           每行对应一个基函数, 每列对应一个自变量.
+	 *           数组维度是: n*m; 矩阵
+	 * @param y  样本的因变量. 数组维度是: m*1; 矢量
+	 * @param c  待拟合系数. 数组维度是: n*1; 矢量
+	 * @return
+	 * 拟合成功标志. true: 成功; false: 失败
+	 * @note
+	 * - 初始版本. 待升级: 使用范式函数替代自变量表述方式
+	 * - 数组x和y由用户接口填充数据
+	 * - 最小二乘拟合使用逆矩阵. 当矩阵无对应逆矩阵时, 求解失败.
+	 *   例如: 样本数量不足
+	 */
+	bool LSFitLinear(int m, int n, double *x, double *y, double *c);
+	/*!
+	 * @brief LU分解: LU decompose
+	 * @return
+	 */
+	bool LUdecmp();
+	/*!
+	 * @brief LU反向替代: LU back substitution
+	 * @note
+	 */
+	void LUbksb();
+	/*!
+	 * @brief 计算逆矩阵
+	 * @param n     二维矩阵维度
+	 * @param mat0  原始矩阵
+	 * @param mat1  逆矩阵
+	 * @return
+	 * 逆矩阵求解结果. true: 成功; false: 失败
+	 * @note
+	 * - 使用LU分解和反向替代求解逆矩阵
+	 */
+	bool MatrixInvert(int n, double *mat0, double *mat1);
+	/*!
+	 * @brief 计算矩阵乘积
+	 * @param m  矩阵L的高度
+	 * @param p  矩阵L的宽度==矩阵R的高度
+	 * @param n  矩阵R的宽度
+	 * @param L  m*p矩阵
+	 * @param R  p*n矩阵
+	 * @param Y  矩阵乘积, m*n矩阵
+	 * @note
+	 * - Y的存储空间由用户管理
+	 */
+	void MatrixMultiply(int m, int p, int n, double *L, double *R, double *Y);
+	/*!
+	 * @brief 计算转置矩阵
+	 * @param m     原始矩阵高度==转置矩阵宽度
+	 * @param n     原始矩阵宽度==转置矩阵高度
+	 * @param mat0  原始矩阵
+	 * @param mat1  转置矩阵
+	 */
+	void MatrixTranspose(int m, int n, double *mat0, double *mat1);
+};
+//////////////////////////////////////////////////////////////////////////////
+} /* namespace AstroUtil */
+
+#endif /* SRC_AMATH_H_ */
