@@ -1,5 +1,5 @@
 bin_PROGRAMS=airs1
-airs1_SOURCES=Parameter.cpp ADIReduct.cpp ADIProcess.cpp ProjectTNX.hpp AStarMatch.cpp \
+airs1_SOURCES=Parameter.cpp AMath.cpp ADIReduct.cpp ADIProcess.cpp ProjectTNX.hpp AStarMatch.cpp \
               airs.cpp
 
 if DEBUG

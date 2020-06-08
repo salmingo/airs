@@ -36,25 +36,41 @@ public:
 	bool LSFitLinear(int m, int n, double *x, double *y, double *c);
 	/*!
 	 * @brief LU分解: LU decompose
+	 * @param n    矩阵维度
+	 * @param a    n*n二维矩阵
+	 * @param idx  n*1矢量, 存储行置换索引
 	 * @return
-	 */
-	bool LUdecmp();
-	/*!
-	 * @brief LU反向替代: LU back substitution
+	 * LU分解成功标志
 	 * @note
+	 * 分解结果存储在原矩阵中
 	 */
-	void LUbksb();
+	bool LUdecmp(int n, double *a, int *idx);
+	/*!
+	 * @brief LU反向替代法求解未知参数
+	 * @param n   矩阵维度
+	 * @param a   n*n二维矩阵, 是LUdecmp的分解结果
+	 * @param idx n*1矢量, 是LUdecmp的处理结果
+	 * @param b   输入: 等式右侧; 输出: 求解结果
+	 * @return
+	 * 求解结果
+	 * @note
+	 * - 求解方程A×X=B中的X
+	 * - a是LUDecmp分解后的结果
+	 * - idx是LUDecmp分解过程中产生的中间结果
+	 * - b, 在输入时是A×X=B中的B；在输出时是等式中的X的求解结果
+	 * - 若A是奇异矩阵则求解失败
+	 */
+	bool LUbksb(int n, double *a, int *idx, double *b);
 	/*!
 	 * @brief 计算逆矩阵
 	 * @param n     二维矩阵维度
-	 * @param mat0  原始矩阵
-	 * @param mat1  逆矩阵
+	 * @param a     输入: 原始矩阵; 输出: 逆矩阵
 	 * @return
 	 * 逆矩阵求解结果. true: 成功; false: 失败
 	 * @note
 	 * - 使用LU分解和反向替代求解逆矩阵
 	 */
-	bool MatrixInvert(int n, double *mat0, double *mat1);
+	bool MatrixInvert(int n, double *a);
 	/*!
 	 * @brief 计算矩阵乘积
 	 * @param m  矩阵L的高度
@@ -71,10 +87,10 @@ public:
 	 * @brief 计算转置矩阵
 	 * @param m     原始矩阵高度==转置矩阵宽度
 	 * @param n     原始矩阵宽度==转置矩阵高度
-	 * @param mat0  原始矩阵
-	 * @param mat1  转置矩阵
+	 * @param a     原始矩阵
+	 * @param b     转置矩阵
 	 */
-	void MatrixTranspose(int m, int n, double *mat0, double *mat1);
+	void MatrixTranspose(int m, int n, double *a, double *b);
 };
 //////////////////////////////////////////////////////////////////////////////
 } /* namespace AstroUtil */

@@ -24,6 +24,7 @@
 #include "globaldef.h"
 #include "Parameter.h"
 #include "ADIProcess.h"
+#include "AMath.h"
 
 using namespace AstroUtil;
 typedef std::vector<string> strvector;
@@ -60,6 +61,42 @@ int main(int argc, char **argv) {
 		switch(ch) {
 		case 'h':
 			Usage();
+			// 验证矩阵操作与最小二乘拟合
+			{
+				AMath math;
+				int i, j;
+				int n(2);	// 2*2
+				double a[2][2];
+				double *aptr;
+				a[0][0] = 1.0;
+				a[0][1] = 2.0;
+				a[1][0] = 3.0;
+				a[1][1] = 4.0;
+
+				for (j = 0, aptr = &a[0][0]; j < n; ++j) {
+					for (i = 0; i < n; ++i, ++aptr) {
+						printf ("%.1f  ", *aptr);
+					}
+					printf ("\n");
+				}
+				printf ("\n\n");
+				math.MatrixInvert(n, &a[0][0]);
+				for (j = 0, aptr = &a[0][0]; j < n; ++j) {
+					for (i = 0; i < n; ++i, ++aptr) {
+						printf ("%.1f  ", *aptr);
+					}
+					printf ("\n");
+				}
+				printf ("\n\n");
+				math.MatrixInvert(n, &a[0][0]);
+				for (j = 0, aptr = &a[0][0]; j < n; ++j) {
+					for (i = 0; i < n; ++i, ++aptr) {
+						printf ("%.1f  ", *aptr);
+					}
+					printf ("\n");
+				}
+			}
+
 			return -1;
 		case 'd':
 			printf("generating default configuration file here\n");
