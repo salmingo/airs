@@ -52,7 +52,7 @@ esac],
 AM_CONDITIONAL(DEBUG, test x"$debug" = x"true")
 
 AC_CHECK_HEADERS([unistd.h])
-AC_CHECK_FUNCS([mkdir strstr memset pow sqrt])
+AC_CHECK_FUNCS([mkdir strstr memset pow sqrt bzero])
 AC_CHECK_HEADER_STDBOOL
 
 AC_CONFIG_FILES(Makefile src/Makefile)

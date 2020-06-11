@@ -14,14 +14,7 @@
 
 namespace AstroUtil {
 //////////////////////////////////////////////////////////////////////////////
-AMath::AMath() {
-
-}
-
-AMath::~AMath() {
-}
-
-bool AMath::LSFitLinear(int m, int n, double *x, double *y, double *c) {
+bool LSFitLinear(int m, int n, double *x, double *y, double *c) {
 	bool rslt(false);
 	// A*c=Y ==> c = A^-1*Y
 	double *A  = new double[n * n];
@@ -63,107 +56,121 @@ bool AMath::LSFitLinear(int m, int n, double *x, double *y, double *c) {
 	return rslt;
 }
 
-bool AMath::LUdecmp(int n, double *a, int *idx) {
-	int i, j, k, imax, nm1(n - 1), np(1);
+bool LUdecmp(int n, double *a, int *idx) {
+	bool rslt(true);
+	int row, col, k, imax, np(1);
+	double EPS(1.0E-20);
 	double amax, asum, t;
 	double *aptr, *aptr1, *aptr2;
 	double *scale = new double[n];
 
-	// 统计行归一比例尺
-	for (j = 0, aptr = a; j < n; ++j) {
+	// 统计行归一比例因子
+	for (row = 0, aptr = a; row < n; ++row) {// 遍历: 行
 		amax = 0.0;
-		for (i = 0; i < n; ++i, ++aptr) {
+		for (col = 0; col < n; ++col, ++aptr) {// 遍历: 列
 			if ((t = fabs(*aptr)) > amax) amax = t;
 		}
-		if (amax < AEPS) {// 奇异矩阵
+		if (amax < EPS) {// 奇异矩阵
 			delete []scale;
 			return false;
 		}
-		scale[j] = 1.0 / amax;
+		scale[row] = 1.0 / amax;
 	}
+
 	// LU分解
-	for (j = 0, aptr = a; j < n; ++j, aptr += (n + 1)) {
-		// 初始化L(不含对角线)
-		for (i = 0, aptr1 = a; i < j; ++i, aptr1 += n) {
-			asum = aptr1[j];
-			for (k = 0, aptr2 = a + j; k < i; ++k, aptr2 += n) {
-				asum -= aptr1[k] * *aptr2;
+	for (col = 0; col < n && rslt; ++col) {
+		for (row = 0, aptr = a; row < col; ++row, aptr += n) {
+			asum = aptr[col];
+			for (k = 0, aptr1 = aptr, aptr2 = a + col; k < row; ++k, ++aptr1, aptr2 += n) {
+				asum -= (*aptr1 * *aptr2);
 			}
-			aptr1[j] = asum;
+			aptr[col] = asum;
 		}
-		// 初始化U(含对角线)
-		amax = 0.0;
-		for (i = j, aptr1 = a + i * n; i < n; ++i, aptr1 += n) {
-			asum = aptr1[j];
-			for (k = 0, aptr2 = a + j; k < j; ++k, aptr2 += n) {
-				asum -= aptr1[k] * *aptr2;
+
+		for (row = col, amax = 0.0, aptr = a; row < n; ++row, aptr += n) {
+			asum = aptr[col];
+			for (k = 0, aptr1 = aptr, aptr2 = a + col; k < row; ++k, ++aptr1, aptr2 += n) {
+				asum -= (*aptr1 * *aptr2);
 			}
-			aptr1[j] = asum;
-			t = scale[i] * fabs(asum);
-			if (t >= amax) {
-				imax = i;
+			aptr[col] = asum;
+
+			if ((t = scale[row] * fabs(asum)) >= amax) {
+				imax = row;
 				amax = t;
 			}
 		}
-		// 检查并交换行
-		if (j != imax) {
-			for (k = 0, aptr1 = a + imax * n, aptr2 = a + j * n; k < n; ++k, ++aptr1, ++aptr2) {
-				t = *aptr1;
+
+		if (col != imax) {
+			for (k = 0, aptr1 = a + imax * n, aptr2 = a + col * n; k < n; ++k, ++aptr1, ++aptr2) {
+				t      = *aptr1;
 				*aptr1 = *aptr2;
 				*aptr2 = t;
 			}
-			np = -np;	// 行置换次数的奇偶性
-			scale[imax] = scale[j];
+			np = -np;	// 行交换次数的奇偶性
+			scale[imax] = scale[col];
 		}
-		idx[j] = imax;
-		// 绕轴归一
-		if (j != nm1) {
-			t = 1. / *aptr;
-			for (i = j + 1, aptr1 = a + (j + 1) * n + j; i < n; ++i, aptr1 += n) {
-				*aptr1 = *aptr1 * t;
+		idx[col] = imax;
+
+		if (fabs(t = a[col * n + col]) < EPS) rslt = false;
+		else {
+			t = 1.0 / t;
+			for (row = col + 1, aptr = a + row * n + col; row < n; ++row, aptr += n) {
+				*aptr = *aptr * t;
 			}
 		}
 	}
 	delete []scale;
 
-	// 检查分解后矩阵的奇异性: 对角线上有0
-	for (j = 0, aptr = a; j < n; ++j, aptr += (n + 1)) {
-		if (*aptr < AEPS) return false;
+	if (rslt) {
+		printf ("LUdecmp result:\n");
+		for (row = 0, aptr = a; row < n; ++row) {
+			for (col = 0; col < n; ++col, ++aptr) {
+				printf ("%f  ", *aptr);
+			}
+			printf ("\n");
+		}
+		printf ("\n");
 	}
-	return true;
+
+	return rslt;
 }
 
-bool AMath::LUbksb(int n, double *a, int *idx, double *b) {
-	int i, j, k, ii(-1);
+bool LUbksb(int n, double *a, int *idx, double *b) {
+	bool rslt(true);
+	int row, col, k, ii(-1);
+	double EPS(1.0E-20);
 	double sum;
-	double *aptr, *bptr;
+	double *aptr, *aptr1, *bptr;
 
-	for (i = 0, aptr = a; i < n; ++i, aptr += n) {// 正向替代
-		k = idx[i];
-		sum = b[k];
-		b[k] = b[i];
-
+	for (row = 0, aptr = a; row < n; ++row, aptr += n) {
+		k      = idx[row];
+		sum    = b[k];
+		b[k]   = b[row];
 		if (ii != -1) {
-			for (j = ii, bptr = b + ii; j < i; ++j, ++bptr) {
-				sum -= (aptr[j] * *bptr);
+			for (col = ii, aptr1 = aptr + col, bptr = b + col; col < row; ++col, ++aptr1, ++bptr) {
+				sum -= (*aptr1 * *bptr);
 			}
 		}
-		else if (fabs(sum) > AEPS) ii = i;
-		b[i] = sum;
+		else if (fabs(sum) > EPS) ii = row;
+		b[row] = sum;
 	}
-	for (i = n - 1, aptr = a + (n - 1) * n; i >= 0; --i, aptr -= n) {// 反向替代, 求解
-		sum = b[i];
-		for (j = i + 1, bptr = b + i + 1; j < n; ++j, ++bptr) {
-			sum -= (aptr[j] * *bptr);
+
+	for (row = n - 1, aptr = a + row * n; row >= 0 && rslt; --row, aptr -= n) {
+		rslt = fabs(aptr[row]) > EPS;
+		if (rslt) {
+			sum = b[row];
+			for (col = row + 1, aptr1 = aptr + col, bptr = b + col; col < n; ++col, ++aptr1, ++bptr) {
+				sum -= (*aptr1 * *bptr);
+			}
+			b[row] = sum / aptr[row];
 		}
-		if (fabs(aptr[i]) < AEPS) return false;	// 奇异矩阵
-		b[i] = sum / aptr[i];
 	}
-	return true;
+
+	return rslt;
 }
 
 // 计算逆矩阵
-bool AMath::MatrixInvert(int n, double *a) {
+bool MatrixInvert(int n, double *a) {
 	int n2 = n * n;
 	double *y = new double[n2];
 	int *idx  = new int[n];
@@ -174,14 +181,6 @@ bool AMath::MatrixInvert(int n, double *a) {
 	bzero(y, sizeof(double) * n2);
 	for (i = 0, yptr = y; i < n; ++i, yptr += (n + 1)) *yptr = 1.0;
 	if (LUdecmp(n, a, idx)) {
-		yptr = a;
-		for (int j = 0; j < n; ++j) {
-			for (i = 0; i < n; ++i, ++yptr) {
-				printf ("%.1f  ", *yptr);
-			}
-			printf ("\n");
-		}
-
 		for (i = 0, yptr = y; i < n; ++i, ++yptr) {
 			LUbksb(n, a, idx, yptr);
 		}
@@ -195,7 +194,7 @@ bool AMath::MatrixInvert(int n, double *a) {
 }
 
 // 计算矩阵乘积
-void AMath::MatrixMultiply(int m, int p, int n, double *L, double *R, double *Y) {
+void MatrixMultiply(int m, int p, int n, double *L, double *R, double *Y) {
 	int i, j, k;
 	double sum;
 	double *Lptr, *Rptr, *Yptr;
@@ -208,18 +207,6 @@ void AMath::MatrixMultiply(int m, int p, int n, double *L, double *R, double *Y)
 				sum += *Lptr * *Rptr;
 			}
 			*Yptr = sum;
-		}
-	}
-}
-
-// 计算转置矩阵
-void AMath::MatrixTranspose(int m, int n, double *a, double *b) {
-	int i, j;
-	double *aptr, *bptr;
-
-	for (j = 0, aptr = a; j < m; ++j) {
-		for (i = 0, bptr = b + j; i < n; ++i, ++aptr, bptr += m) {
-			*bptr = *aptr;
 		}
 	}
 }
