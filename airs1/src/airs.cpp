@@ -61,59 +61,6 @@ int main(int argc, char **argv) {
 		switch(ch) {
 		case 'h':
 			Usage();
-			// 验证矩阵操作与最小二乘拟合
-			{
-				int m(4), n(5), r, c, k;
-				double a[4][5];
-				double *aptr;
-				for (r = 0, k = 1, aptr = &a[0][0]; r < m; ++r) {
-					for (c = 0; c < n; ++c, ++k, ++aptr) {
-						*aptr = k;
-						printf ("%4.1f ", *aptr);
-					}
-					printf ("\n");
-				}
-				printf ("\n");
-
-				MatrixTranspose<double>(m, n, &a[0][0]);
-				for (r = 0, aptr = &a[0][0]; r < n; ++r) {
-					for (c = 0; c < m; ++c, ++aptr) {
-						printf ("%4.1f ", *aptr);
-					}
-					printf ("\n");
-				}
-				printf ("\n");
-
-//				int i, j, k;
-//				int n(3);	// 3*3
-//				double a[3][3];
-//				double *aptr;
-//
-//				for (j = 0, k = 1, aptr = &a[0][0]; j < n; ++j) {
-//					for (i = 0; i < n; ++i, ++k, ++aptr) {
-//						*aptr = k;
-//						printf ("%.1f  ", *aptr);
-//					}
-//					printf ("\n");
-//				}
-//				printf ("\n\n");
-//				math.MatrixInvert(n, &a[0][0]);
-//				for (j = 0, aptr = &a[0][0]; j < n; ++j) {
-//					for (i = 0; i < n; ++i, ++aptr) {
-//						printf ("%.1f  ", *aptr);
-//					}
-//					printf ("\n");
-//				}
-//				printf ("\n\n");
-//				math.MatrixInvert(n, &a[0][0]);
-//				for (j = 0, aptr = &a[0][0]; j < n; ++j) {
-//					for (i = 0; i < n; ++i, ++aptr) {
-//						printf ("%.1f  ", *aptr);
-//					}
-//					printf ("\n");
-//				}
-			}
-
 			return -1;
 		case 'd':
 			printf("generating default configuration file here\n");

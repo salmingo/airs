@@ -39,9 +39,7 @@ bool AMath::LSFitLinear(int m, int n, double *x, double *y, double *c) {
 		for (j = 0; j < n; ++j, ++Aptr) {
 			L = x + i * m;
 			R = x + j * m;
-			for (k = 0, t = 0.0; k < m; ++k, ++L, ++R) {
-				t += *L * *R;
-			}
+			for (k = 0, t = 0.0; k < m; ++k, ++L, ++R) t += *L * *R;
 			*Aptr = t;
 		}
 
@@ -52,11 +50,10 @@ bool AMath::LSFitLinear(int m, int n, double *x, double *y, double *c) {
 		*Yptr = t;
 	}
 	// 拟合系数
-//	if (LUdcmp(n, A, idx)) {
-//		LUbksb(n, A, idx, Y);
-//		memcpy(c, Y, sizeof(double) * n);
-//		rslt = true;
-//	}
+	if (LUdcmp(n, A)) {
+		LUsolve(Y, c);
+		rslt = true;
+	}
 
 	delete []A;
 	delete []Y;
@@ -74,55 +71,91 @@ bool AMath::LUdcmp(int n, double *a) {
 	int i, j, k, imax;
 	double t, big, *ptr, *ptr1, *ptr2;
 
-	np = 0;
 	for (i = 0, ptr = a; i < n; ++i) {
-		big = 0.0;
-		for (j = 0; j < n; ++j, ++ptr) {
+		for (j = 0, big = 0.0; j < n; ++j, ++ptr) {
 			if ((t = fabs(*ptr)) > big) big = t;
 		}
-		if (big < TINY) {
+		if (big == 0.0) {
 			np = -1;
 			return false;	// 奇异矩阵
 		}
 		scale[i] = 1.0 / big;
 	}
 
-	for (j = 0, ptr = a; j < n; ++j, ptr += n) {
-		big = 0.0;
-		for (i = j, ptr1 = ptr + j; i < n; ++i, ptr1 += n) {
+	for (k = 0, np = 0, ptr = a; k < n; ++k, ptr += n) {// ptr: k行首, a[k][0]
+		for (i = k, big = 0.0, ptr1 = ptr + k; i < n; ++i, ptr1 += n) {// ptr1初始: a[k][k]
 			if ((t = scale[i] * fabs(*ptr1)) > big) {
 				big  = t;
 				imax = i;
 			}
 		}
-		if (j != imax) {
-			for (k = 0, ptr1 = a + imax * n, ptr2 = ptr; k < n; ++k, ++ptr1, ++ptr2) {
+		if (k != imax) {
+			// ptr1初始: a[imax][0]
+			// ptr2初始: a[k][0]
+			for (j = 0, ptr1 = a + imax * n, ptr2 = ptr; j < n; ++j, ++ptr1, ++ptr2) {
 				t     = *ptr1;
 				*ptr1 = *ptr2;
 				*ptr2 = t;
 			}
 			++np;
-			scale[imax] = scale[j];
+			scale[imax] = scale[k];
 		}
-		idx[j] = imax;
-		if (ptr[j] < TINY) {
-			np = -1;
-			return false;
-		}
-		for (i = j + 1, ptr1 = ptr + n; i < n; ++i, ptr1 += n) {
-			t = ptr1[j] /= ptr[j];	//??? /= => / ???
-			for (k = j + 1, ptr2 = ptr + k; k < n; ++k, ++ptr2) {
-				ptr1[k] -= t * *ptr2;
+		idx[k] = imax;
+		if (ptr[k] == 0.0) ptr[k] = TINY;
+		for (i = k + 1, ptr1 = ptr + n; i < n; ++i, ptr1 += n) {// ptr1: a[i][0]=a[k+1][0]
+			t = ptr1[k] /= ptr[k];
+			for (j = k + 1, ptr2 = ptr + j; j < n; ++j, ++ptr2) {// ptr2: a[k][j]
+				ptr1[j] -= t * *ptr2;
 			}
 		}
 	}
 
-	return np != 0;
+	return np >= 0;
 }
 
 bool AMath::LUsolve(double *b, double *x) {
+	if (ludcmp_.IsSingular()) return false;
+	int n = ludcmp_.n;
+	int i, j, k, ii(0);
+	double sum;
+	vector<int> &idx = ludcmp_.idx;
+	double *luptr;
 
-	return false;
+	if (x != b) memcpy(x, b, sizeof(double) * n);
+	for (i = 0, luptr = ludcmp_.luptr; i < n; ++i, luptr += n) {
+		k    = idx[i];
+		sum  = x[k];
+		x[k] = x[i];
+		if (ii) {
+			for (j = ii - 1; j < i; ++j) sum -= luptr[j] * x[j];
+		}
+		else if (sum != 0.0) ii = i + 1;
+		x[i] = sum;
+	}
+	for (i = n - 1, luptr = ludcmp_.luptr + i * n; i >= 0; --i, luptr -= n) {
+		sum  = x[i];
+		for (j = i + 1; j < n; ++j) sum -= luptr[j] * x[j];
+		x[i] = sum / luptr[i];
+	}
+
+	return true;
+}
+
+bool AMath::LUsolve(int m, double *b, double *x) {
+	if (ludcmp_.IsSingular()) return false;
+	int n = ludcmp_.n;
+	int i, j;
+	double *col = new double[n];
+	double *ptr;
+
+	for (j = 0; j < m; ++j) {
+		for (i = 0, ptr = b + j; i < n; ++i, ptr += m) col[i] = *ptr;
+		LUsolve(col, col);
+		for (i = 0, ptr = x + j; i < n; ++i, ptr += m) *ptr = col[i];
+	}
+
+	delete []col;
+	return true;
 }
 
 // 计算逆矩阵
@@ -136,13 +169,10 @@ bool AMath::MatrixInvert(int n, double *a) {
 	bzero(y, sizeof(double) * n2);
 	for (i = 0, yptr = y; i < n; ++i, yptr += (n + 1)) *yptr = 1.0;
 	if (LUdcmp(n, a)) {
-		for (i = 0, yptr = y; i < n; ++i, ++yptr) {
-//			LUsolve(n, a, idx, yptr);
-		}
+		LUsolve(n, y, y);
 		memcpy(a, y, sizeof(double) * n2);
 		rslt = true;
 	}
-
 	delete []y;
 	return rslt;
 }

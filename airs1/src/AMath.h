@@ -21,11 +21,16 @@ public:
 	 */
 	struct LUdcmp {
 		int n;				/// n=矩阵高度=矩阵宽度
-		int np;				/// 行置换次数. 0: 未做LU分解; > 0: 次数; < 0: 奇异矩阵
+		int np;				/// 行置换次数. >= 0: 次数; < 0: 奇异矩阵
 		double *luptr;		/// LU分解结果指针==输入矩阵指针
 		vector<int> idx;	/// LU分解过程中的行置换索引
 
 	public:
+		LUdcmp() {
+			n = np = -1;
+			luptr = NULL;
+		}
+
 		/*!
 		 * @brief 重置LU分解输入矩阵
 		 * @param _n   矩阵宽度=矩阵高度=n
@@ -36,6 +41,14 @@ public:
 			n     = _n;
 			np    = 0;
 			luptr = _ptr;
+		}
+		/*!
+		 * @brief 判断是否奇异矩阵
+		 * @return
+		 * 奇异矩阵标志
+		 */
+		bool IsSingular() {
+			return np < 0;
 		}
 	};
 
@@ -77,15 +90,33 @@ public:
 	bool LUdcmp(int n, double *a);
 	/*!
 	 * @brief LU反向替代法求解未知参数
-	 * @param b   等式右侧
- 	 * @param x   求解结果
+	 * @param b   等式右侧, n*1矢量
+ 	 * @param x   求解结果, n*1矢量
 	 * @return
 	 * 求解结果
 	 * @note
 	 * - 求解方程A×X=B中的X
 	 * - 若A是奇异矩阵则求解失败
+	 * - 调用顺序:
+	 *   1. LUdcmp
+	 *   2. LUsolve
 	 */
 	bool LUsolve(double *b, double *x);
+	/*!
+	 * @brief LU反向替代法求解未知参数
+	 * @param m   矩阵宽度, 即列数
+	 * @param b   等式右侧, n*m矩阵
+ 	 * @param x   求解结果, n*m矩阵
+	 * @return
+	 * 求解结果
+	 * @note
+	 * - 求解方程A×X=B中的X
+	 * - 若A是奇异矩阵则求解失败
+	 * - 调用顺序:
+	 *   1. LUdcmp
+	 *   2. LUsolve
+	 */
+	bool LUsolve(int m, double *b, double *x);
 	/*!
 	 * @brief 计算n*n矩阵的行列式
 	 * @return
@@ -133,20 +164,6 @@ public:
 				*bptr = *aptr;
 			}
 		}
-	}
-	/*!
-	 * @brief 计算转置矩阵
-	 * @param m     原始矩阵高度==转置矩阵宽度
-	 * @param n     原始矩阵宽度==转置矩阵高度
-	 * @param a     输入: 原始矩阵; 输出: 转置矩阵
-	 * @note
-	 * - 转置矩阵方法2: 使用1缓冲区, 算法复杂度m*n*3
-	 */
-	template <typename T>
-	void MatrixTranspose(int m, int n, T *a) {
-		int i, j, r, c;
-		T t;
-
 	}
 };
 //////////////////////////////////////////////////////////////////////////////
