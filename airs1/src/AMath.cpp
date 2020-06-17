@@ -27,7 +27,6 @@ bool AMath::LSFitLinear(int m, int n, double *x, double *y, double *c) {
 	// A*c=Y ==> c = A^-1*Y
 	double *A  = new double[n * n];
 	double *Y  = new double[n];
-	int *idx   = new int[n];
 	double *L, *R, *Aptr, *Yptr, t;
 	int i, j, k;
 
@@ -57,7 +56,6 @@ bool AMath::LSFitLinear(int m, int n, double *x, double *y, double *c) {
 
 	delete []A;
 	delete []Y;
-	delete []idx;
 	return rslt;
 }
 
@@ -156,6 +154,18 @@ bool AMath::LUsolve(int m, double *b, double *x) {
 
 	delete []col;
 	return true;
+}
+
+double AMath::LUDet(int n, double *a) {
+	if (ludcmp_.luptr == a && ludcmp_.np < 0) return 0.0;
+	if (!LUdcmp(n, a)) return 0.0;
+
+	int i;
+	double *ptr, t(1.0);
+
+	for (i = 0, ptr = a; i < n; ++i, ptr += (n + 1)) t *= *ptr;
+	if (ludcmp_.np % 2) t = -t;
+	return t;
 }
 
 // 计算逆矩阵

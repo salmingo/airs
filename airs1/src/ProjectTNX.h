@@ -9,15 +9,18 @@
  * - TNX投影正反向转换
  * - 函数基1: 二元n阶幂函数, 适用于小视场
  * - 函数基2: 勒让德函数, 适用于中、大视场
- * - 拟合分为两个步骤:
- *   1. 当阶次==2时, 生成仿射变换矩阵
- *   2. 当阶次>2时, 生成仿射变换矩阵和残差改正项
+ * - 拟合过程:
+ *   1. 查找最接近输入crpix的参考点I
+ *   2. 基于I完成拟合过程, 包括两个步骤: (1) 拟合旋转矩阵; (2) 拟合残差
+ *   3. 基于上述拟合, 计算输入crpix的参考点II对应的赤道坐标
+ *   4. 基于II完成拟合过程, 包括两个步骤: (1) 拟合旋转矩阵; (2) 拟合残差
+ *   5. 计算样本拟合残差, 其统计结果作为WCS模型的拟合误差
+ * - 若未指定crpix, 则默认采用最接近中心点的样本作为参考点
  */
 
-#ifndef SRC_PROJECTTNX_HPP_
-#define SRC_PROJECTTNX_HPP_
+#ifndef SRC_PROJECTTNX_H_
+#define SRC_PROJECTTNX_H_
 
-#include <Eigen/Dense>
 #include "ADefine.h"
 #include "ADIData.h"
 
@@ -79,6 +82,9 @@ protected:
 	int nitem;		//< 基函数数量
 	FunctionBase basefunc;	//< 基函数
 
+	bool xyref_auto;	//< XY参考点坐标采用自动统计值
+	PT2F crval_auto;	//< 参考点对应的WCS坐标
+	PT2F crpix_auto;	//< 参考点对应的XY坐标
 	/*!
 	 * @var xmin, ymin; xmax, ymax : 归一化范围
 	 */
@@ -151,6 +157,7 @@ protected:
 			for (i = 0, t = yitem[j]; i < imax; ++i, ++k) ptr[k] =  xitem[i] * t;
 		}
 	}
+
 	/*!
 	 * @brief 计算改正项
 	 * @param ptr 矢量存储空间
@@ -201,7 +208,11 @@ public:
 	 * @param xorder X轴最高阶次
 	 * @param yorder Y轴最高阶次
 	 * @return
-	 * 成功返回0
+	 *  0 : 成功
+	 * -1 : 无效函数
+	 * -2 : 无效交叉项
+	 * -3 : 无效X阶次
+	 * -4 : 无效Y阶次
 	 */
 	int SetFitModel(int func, int xterm, int xorder, int yorder) {
 		if (func <= TNX_MIN || func >= TNX_MAX) return -1;
@@ -216,15 +227,15 @@ public:
 		else if (func == TNX_CHEBYSHEV) basefunc = &chebyshev_array;
 		n = xterm_count(xterm, xorder, yorder);
 		if (this->xorder != xorder) {
-			free(&xitem);
+			free_array(&xitem);
 			xitem = new double[xorder];
 		}
 		if (this->yorder != yorder) {
-			free(&yitem);
+			free_array(&yitem);
 			yitem = new double[yorder];
 		}
 		if (nitem != n) {
-			free(&coef);
+			free_array(&coef);
 			coef = new double[n];
 		}
 
@@ -237,25 +248,62 @@ public:
 	}
 
 	/*!
-	 * @brief 设置归一化范围
+	 * @brief 设置XY参考系
+	 * @param x1  归一化范围, X最小值
+	 * @param y1  归一化范围, Y最小值
+	 * @param x2  归一化范围, X最大值
+	 * @param y2  归一化范围, Y最大值
+	 * @param x0  XY参考中心, X坐标
+	 * @param y0  XY参考中心, Y坐标
 	 * @note
 	 * 默认归一化范围是: (0, 0)<->(wimg - 1, himg - 1)
 	 */
-	void SetNormalRange(int x1, int y1, int x2, int y2) {
+	void SetRefXY(int x1, int y1, int x2, int y2, double x0 = 0.0, double y0 = 0.0) {
 		xmin = x1, ymin = y1;
 		xmax = x2, ymax = y2;
+
+		if (x0 < x1 || x0 > x1 || y0 < y1 || y0 > y1) xyref_auto = true;
+		else {
+			xyref_auto = false;
+			crpix.x = x0;
+			crpix.y = y0;
+		}
 	}
 
 	/*!
 	 * @brief 拟合WCS模型
+	 * @return
+	 * 拟合结果
 	 */
-	void ProcessFit() {
-		// 3阶拟合, 生成旋转矩阵
+	bool ProcessFit();
 
-		// 高阶拟合, 生成改正项
-	}
+protected:
+	/*!
+	 * @brief 尝试拟合WCS模型
+	 * @return
+	 * 拟合结果
+	 * @note
+	 * - 使用crpix_auto和crval_auto作为参考点, 即当必要时, 需提前设置这两个参量
+	 * - crval_auto的量纲是弧度
+	 */
+	bool try_fit();
+	/*!
+	 * @brief 依据参考点计算一个样本的投影坐标
+	 * @param nf    参与拟合的样本, 样本是与星表匹配成功的恒星
+	 * @param dx    样本相对参考点的X坐标
+	 * @param dy    样本相对参考点的Y坐标
+	 * @param xi    样本相对参考点的投影坐标, 量纲: 弧度
+	 * @param eta   样本相对参考点的投影坐标, 量纲: 弧度
+	 */
+	void sample_project(const ObjectInfo &nf, double &dx, double &dy, double &xi, double eta);
+	/*!
+	 * @brief 使用WCS模型, 计算XY对应的天球坐标
+	 * @param xy  XY坐标
+	 * @param rd  天球/赤道坐标
+	 */
+	void xy2rd(const PT2F &xy, PT2F &rd);
 };
 //////////////////////////////////////////////////////////////////////////////
 } /* namespace AstroUtil */
 
-#endif /* SRC_PROJECTTNX_HPP_ */
+#endif /* SRC_PROJECTTNX_H_ */

@@ -118,11 +118,15 @@ public:
 	 */
 	bool LUsolve(int m, double *b, double *x);
 	/*!
-	 * @brief 计算n*n矩阵的行列式
+	 * @brief 基于LU分解计算行列式
+	 * @param n    矩阵维度
+	 * @param a    n*n二维矩阵
 	 * @return
 	 * 行列式
+	 * @note
+	 * - 奇异矩阵返回0.0
 	 */
-	double Det();
+	double LUDet(int n, double *a);
 	/*!
 	 * @brief 计算逆矩阵
 	 * @param n     二维矩阵维度

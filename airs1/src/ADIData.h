@@ -23,6 +23,12 @@ typedef boost::shared_array<int> intarr;
 typedef struct Point2f {
 	double x;
 	double y;
+
+public:
+	Point2f& operator=(const Point2f &other) {
+		if (this != &other) memcpy(this, &other, sizeof(Point2f));
+		return *this;
+	}
 }PT2F, * PPT2F;
 
 /*!
