@@ -83,8 +83,6 @@ protected:
 	FunctionBase basefunc;	//< 基函数
 
 	bool xyref_auto;	//< XY参考点坐标采用自动统计值
-	PT2F crval_auto;	//< 参考点对应的WCS坐标
-	PT2F crpix_auto;	//< 参考点对应的XY坐标
 	/*!
 	 * @var xmin, ymin; xmax, ymax : 归一化范围
 	 */
@@ -98,13 +96,13 @@ protected:
 
 public:
 	/* 拟合结果 */
-	PT2F crval;			//< 参考点对应的WCS坐标
+	PT2F crval;			//< 参考点对应的天球坐标
 	PT2F crpix;			//< 参考点对应的XY坐标
 	double cd[2][2];	//< 旋转矩阵
 	double ccd[2][2];	//< 逆旋转矩阵
-	double xscale;		//< X方向像元比例尺, 量纲: 角秒/像素
-	double yscanle;		//< Y方向像元比例尺, 量纲: 角秒/像素
+	double scale;		//< X方向像元比例尺, 量纲: 角秒/像素
 	double rotation;	//< X方向正向与WCS X'正向的旋转角, 量纲: 角度
+	double errfit;		//< 拟合残差, 量纲: 角秒
 
 public:
 	virtual ~ProjectTNX() {
@@ -184,17 +182,42 @@ protected:
 
 	/*!
 	 * @brief 球面投影到平面, TAN
+	 * @note
+	 * - (xi, eta)量纲: 弧度
 	 */
-	void s2p(double A0, double D0, double A, double D, double &xi, double &eta) {
+	void sphere2plane(double A0, double D0, double A, double D, double &xi, double &eta) {
 		double fract = sin(D0) * sin(D) + cos(D0) * cos(D) * cos(A - A0);
 		xi  = cos(D) * sin(A - A0) / fract;
 		eta = (cos(D0) * sin(D) - sin(D0) * cos(D) * cos(A - A0)) / fract;
 	}
 
 	/*!
-	 * @brief 平面投影到球面, TAN
+	 * @brief 投影平面坐标变换至图像坐标
+	 * @note
+	 * - (xi, eta)量纲: 弧度
 	 */
-	void p2s(double A0, double D0, double xi, double eta, double &A, double &D) {
+	void plane2image(double xi, double eta, double x0, double y0, double &x, double &y) {
+		x = (ccd[0][0] * xi + ccd[0][1] * eta) + x0;
+		y = (ccd[1][0] * xi + ccd[1][1] * eta) + y0;
+	}
+
+	/*!
+	 * @brief 图像坐标变换至投影平面
+	 * @note
+	 * - (xi, eta)量纲: 弧度
+	 */
+	void image2plane(double x0, double y0, double x, double y, double &xi, double &eta) {
+		double dx(x - x0), dy(y - y0);
+		xi  = cd[0][1] * dx + cd[0][1] * dy;
+		eta = cd[1][0] * dx + cd[1][1] * dy;
+	}
+
+	/*!
+	 * @brief 平面投影到球面, TAN
+	 * @note
+	 * - (xi, eta)量纲: 弧度
+	 */
+	void plane2sphere(double A0, double D0, double xi, double eta, double &A, double &D) {
 		double fract = cos(D0) - eta * sin(D0);
 		A = cyclemod(A0 + atan2(xi, fract), A2PI);
 		D = atan(((eta * cos(D0) + sin(D0)) * cos(A - A0)) / fract);
@@ -279,29 +302,30 @@ public:
 
 protected:
 	/*!
+	 * @brief 查找最接近指定位置的参考星坐标
+	 * @param refxy   输入: 指定位置XY坐标; 输出: 参考星XY坐标
+	 * @param refrd   参考星天球坐标, 量纲: 弧度
+	 */
+	void find_nearest(PT2F &refxy, PT2F &refrd);
+	/*!
 	 * @brief 尝试拟合WCS模型
+	 * @param refx  参考点X坐标
+	 * @param refy  参考点Y坐标
+	 * @param refr  参考点赤经, 量纲：弧度
+	 * @param refd  参考点赤纬, 量纲: 弧度
 	 * @return
 	 * 拟合结果
 	 * @note
 	 * - 使用crpix_auto和crval_auto作为参考点, 即当必要时, 需提前设置这两个参量
 	 * - crval_auto的量纲是弧度
 	 */
-	bool try_fit();
-	/*!
-	 * @brief 依据参考点计算一个样本的投影坐标
-	 * @param nf    参与拟合的样本, 样本是与星表匹配成功的恒星
-	 * @param dx    样本相对参考点的X坐标
-	 * @param dy    样本相对参考点的Y坐标
-	 * @param xi    样本相对参考点的投影坐标, 量纲: 弧度
-	 * @param eta   样本相对参考点的投影坐标, 量纲: 弧度
-	 */
-	void sample_project(const ObjectInfo &nf, double &dx, double &dy, double &xi, double eta);
+	bool try_fit(const PT2F &refxy, const PT2F &refrd);
 	/*!
 	 * @brief 使用WCS模型, 计算XY对应的天球坐标
 	 * @param xy  XY坐标
 	 * @param rd  天球/赤道坐标
 	 */
-	void xy2rd(const PT2F &xy, PT2F &rd);
+	void xy2rd(const PT2F &refxy, const PT2F &refrd, const PT2F &xy, PT2F &rd);
 };
 //////////////////////////////////////////////////////////////////////////////
 } /* namespace AstroUtil */
