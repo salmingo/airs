@@ -7,16 +7,14 @@
 #include "ProjectTNX.h"
 
 namespace AstroUtil {
+//////////////////////////////////////////////////////////////////////////////
 typedef std::vector<double> dblvec;
 typedef dblvec::iterator it_dblvec;
-
 //////////////////////////////////////////////////////////////////////////////
 bool ProjectTNX::ProcessFit() {
-	// 查找接近视场中心或crpix的参考点
-	// 使用|dx|+|dy|替代距离公式
+	// 查找接近视场中心或crpix的参考点. 使用|dx|+|dy|替代距离公式
 	PT2F refxy, refrd;
-	refxy.x = xyref_auto ? (xmin + xmax) * 0.5 : crpix.x;
-	refxy.y = xyref_auto ? (ymin + ymax) * 0.5 : crpix.y;
+	refxy = crpix;
 	find_nearest(refxy, refrd);
 	// 尝试拟合WCS模型
 	if (!try_fit(refxy, refrd)) return false;
@@ -24,17 +22,40 @@ bool ProjectTNX::ProcessFit() {
 		xy2rd(refxy, refrd, crpix, crval);
 		try_fit(crpix, crval);
 	}
-
-	// 从拟合结果计算其它相关项
-	// 1. 像元比例尺
-	// 2. 逆旋转矩阵
-	// 3. 旋转角
-
-	// 使用已匹配恒星统计拟合误差
+	else {// 使用最接近视场中心的参考星作为参考点
+		crpix = refxy;
+		crval = refrd;
+	}
+	final_fit();
 
 	return true;
 }
 
+void ProjectTNX::XY2RD(double x, double y, double &l, double &b) {
+	xy2rd(crpix.x, crpix.y, crval.x, crval.y, x, y, l, b);
+}
+
+void ProjectTNX::XY2RD(const PT2F &xy, PT2F &rd) {
+	xy2rd(crpix, crval, xy, rd);
+}
+
+void ProjectTNX::RD2XY(const PT2F &rd, PT2F &xy) {
+	double xi, eta;
+	double x0, y0, x1, y1, dxi, deta;
+	int cnt(0);
+
+	sphere2plane(rd.x, rd.y, xi, eta);
+	plane2image(xi, eta, x0, y0);
+
+	do {
+		x1 = x0, y1 = y0;
+		dxi  = res[0].ModelValue(x0, y0);
+		deta = res[1].ModelValue(x0, y0);
+		plane2image(xi - dxi, eta - deta, x0, y0);
+	} while(fabs(x1 - x0) > 1E-3 && fabs(y1 - y0) > 1E-3 && ++cnt < 15);
+}
+
+//////////////////////////////////////////////////////////////////////////////
 void ProjectTNX::find_nearest(PT2F &refxy, PT2F &refrd) {
 	NFObjVector &nfobj = frame->nfobj;
 	int nobj = frame->nfobj;
@@ -57,37 +78,113 @@ void ProjectTNX::find_nearest(PT2F &refxy, PT2F &refrd) {
 
 bool ProjectTNX::try_fit(const PT2F &refxy, const PT2F &refrd) {
 	NFObjVector &nfobj = frame->nfobj;
-	int nobj = frame->nfobj;
-	dblvec dxvec, dyvec, xivec, etavec;
-	// 构建参与拟合的样本
-	for (int i = 0; i < nobj; ++i) {
-		if (nfobj[i].matched == 1) {
-			double dx, dy, xi ,eta;
-//			sample_project(nfobj[i], dx, dy, xi ,eta);
+	int nobj = frame->nfobj, n(0), i;
+	double *X, *Y, xi, eta;
+	AMath math;
+	bool rslt;
 
-			dxvec.push_back(dx);
-			dyvec.push_back(dy);
-			xivec.push_back(xi);
-			etavec.push_back(eta);
+	for (i = 0; i < nobj; ++i) {
+		if (nfobj[i].matched == 1) ++n;
+	}
+	if (n <= res[0].nitem) return false;
+	// 构建参与拟合的样本矩阵
+	// X: 自变量, 2*n
+	// Y: 因变量: 2*n
+	// C: 系数: 2*2, 旋转矩阵
+	X = new double[2.0 * n];
+	Y = new double[2.0 * n];
+	for (i = 0; i < nobj; ++i) {
+		if (nfobj[i].matched == 1) {
+			sphere2plane(refrd.x, refrd.y, nfobj[i].ra_cat * D2R, nfobj[i].dec_cat * D2R, xi, eta);
+
+			X[i]     = nfobj[i].ptbc.x - refxy.x;
+			X[n + i] = nfobj[i].ptbc.y - refxy.y;
+			Y[i]     = xi;
+			Y[n + i] = eta;
 		}
 	}
-	// 拟合旋转矩阵
-	int nsample = dxvec.size(); // 样本数量
-	if (nsample <= 3) return false;	// 旋转矩阵需要至少三个样本
-	AMath math;
+	rslt = math.LSFitLinear(n, 2, X, Y, &cd[0][0]);
 
+	if (rslt) {// 旋转矩阵拟合成功, 继续拟合残差
+		/*
+		 * - X1, X2用于存储原始矩阵和转置矩阵
+		 * - 约束: res[0]和res[1]采用相同的拟合参数, 因此只对res[0]计算基函数
+		 */
+		double *X1 = new double[res[0].nitem * n];
+		double *X2 = new double[res[0].nitem * n];
+		double *ptr;
+		bool rslt1, rslt2;
 
-	// 拟合残差改正项
-	if (nsample <= nitem) {// 残差改正项需要至少 nitem+1 个样本
-		return false;
+		for (i = 0, ptr = X2; i < nobj; ++i, ptr += res[0].nitem) {
+			if (nfobj[i].matched == 1) {
+				// 残差: 因变量
+				image2plane(refxy.x, refxy.y, nfobj[i].ptbc.x, nfobj[i].ptbc.y, xi, eta);
+				Y[i]     = xi - Y[i];
+				Y[n + i] = eta - Y[n + i];
+				// 基函数: 自变量
+				res[0].FitVector(nfobj[i].ptbc.x, nfobj[i].ptbc.y, ptr);
+			}
+		}
+		math.MatrixTranspose(n, res[0].nitem, X2, X1);
+		rslt1 = math.LSFitLinear(n, res[0].nitem, X1, Y,     res[0].coef);
+		rslt2 = math.LSFitLinear(n, res[0].nitem, X1, Y + n, res[1].coef);
+		rslt = rslt1 && rslt2;
+
+		delete []X1;
+		delete []X2;
 	}
 
-	return true;
+	delete []X;
+	delete []Y;
+
+	return rslt;
+}
+
+void ProjectTNX::final_fit() {
+	AMath math;
+
+	memcpy(&ccd[0][0], &ccd[0][0], sizeof(ccd));
+	// 从拟合结果计算其它相关项
+	// 逆旋转矩阵
+	math.MatrixInvert(2, &ccd[0][0]);
+	// 像元比例尺
+	scale = R2AS / math.LUDet(2, &ccd[0][0]);
+	// 旋转角
+	rotation = atan2(cd[0][0], cd[1][0]) * R2D;
+
+	// 使用已匹配恒星统计拟合误差
+	NFObjVector &nfobj = frame->nfobj;
+	int nobj = frame->nfobj, n(0), i;
+	double esum(0.0), esq(0.0), t;
+	nfobj.data();
+	PT2F radc;
+
+	for (int i = 0; i < nobj; ++i) {
+		if (nfobj[i].matched == 1) {
+			XY2RD(nfobj[i].ptbc, radc);
+			t = sphere_range(radc.x, radc.y, nfobj[i].ra_cat * D2R, nfobj[i].dec_cat * D2R);
+			esum += t;
+			esq  += (t * t);
+			++n;
+
+			nfobj[i].ra_inst  = radc.x * R2D;
+			nfobj[i].dec_inst = radc.y * R2D;
+		}
+	}
+	errfit = sqrt((esq - esum * esum / n) / n) * R2AS;
+}
+
+void ProjectTNX::xy2rd(double refx, double refy, double refl, double refb, double x, double y, double &l, double b) {
+	double xi, eta;
+
+	image2plane(refx, refy, x, y, xi, eta);
+	xi  += res[0].ModelValue(x, y) * AS2R;
+	eta += res[1].ModelValue(x, y) * AS2R;
+	plane2sphere(refl, refb, xi, eta, l, b);
 }
 
 void ProjectTNX::xy2rd(const PT2F &refxy, const PT2F &refrd, const PT2F &xy, PT2F &rd) {
-	double xi, eta;
-
+	xy2rd(refxy.x, refxy.y, refrd.x, refrd.y, xy.x, xy.y, rd.x, rd.y);
 }
 
 //////////////////////////////////////////////////////////////////////////////

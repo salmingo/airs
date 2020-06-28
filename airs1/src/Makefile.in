@@ -106,7 +106,7 @@ am__installdirs = "$(DESTDIR)$(bindir)"
 PROGRAMS = $(bin_PROGRAMS)
 am_airs1_OBJECTS = Parameter.$(OBJEXT) AMath.$(OBJEXT) \
 	ADIReduct.$(OBJEXT) ADIProcess.$(OBJEXT) AStarMatch.$(OBJEXT) \
-	airs.$(OBJEXT)
+	AFindPV.$(OBJEXT) airs.$(OBJEXT)
 airs1_OBJECTS = $(am_airs1_OBJECTS)
 am__DEPENDENCIES_1 =
 airs1_DEPENDENCIES = $(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
@@ -129,9 +129,9 @@ DEFAULT_INCLUDES = -I.@am__isrc@ -I$(top_builddir)
 depcomp = $(SHELL) $(top_srcdir)/depcomp
 am__maybe_remake_depfiles = depfiles
 am__depfiles_remade = ./$(DEPDIR)/ADIProcess.Po \
-	./$(DEPDIR)/ADIReduct.Po ./$(DEPDIR)/AMath.Po \
-	./$(DEPDIR)/AStarMatch.Po ./$(DEPDIR)/Parameter.Po \
-	./$(DEPDIR)/airs.Po
+	./$(DEPDIR)/ADIReduct.Po ./$(DEPDIR)/AFindPV.Po \
+	./$(DEPDIR)/AMath.Po ./$(DEPDIR)/AStarMatch.Po \
+	./$(DEPDIR)/Parameter.Po ./$(DEPDIR)/airs.Po
 am__mv = mv -f
 CXXCOMPILE = $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) \
 	$(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS)
@@ -290,7 +290,7 @@ top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 airs1_SOURCES = Parameter.cpp AMath.cpp ADIReduct.cpp ADIProcess.cpp ProjectTNX.hpp AStarMatch.cpp \
-              airs.cpp
+              AFindPV.cpp airs.cpp
 
 @DEBUG_FALSE@AM_CFLAGS = -O3 -Wall
 @DEBUG_TRUE@AM_CFLAGS = -g3 -O0 -Wall -DNDEBUG
@@ -388,6 +388,7 @@ distclean-compile:
 
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ADIProcess.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ADIReduct.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/AFindPV.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/AMath.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/AStarMatch.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/Parameter.Po@am__quote@ # am--include-marker
@@ -542,6 +543,7 @@ clean-am: clean-binPROGRAMS clean-generic mostlyclean-am
 distclean: distclean-am
 		-rm -f ./$(DEPDIR)/ADIProcess.Po
 	-rm -f ./$(DEPDIR)/ADIReduct.Po
+	-rm -f ./$(DEPDIR)/AFindPV.Po
 	-rm -f ./$(DEPDIR)/AMath.Po
 	-rm -f ./$(DEPDIR)/AStarMatch.Po
 	-rm -f ./$(DEPDIR)/Parameter.Po
@@ -593,6 +595,7 @@ installcheck-am:
 maintainer-clean: maintainer-clean-am
 		-rm -f ./$(DEPDIR)/ADIProcess.Po
 	-rm -f ./$(DEPDIR)/ADIReduct.Po
+	-rm -f ./$(DEPDIR)/AFindPV.Po
 	-rm -f ./$(DEPDIR)/AMath.Po
 	-rm -f ./$(DEPDIR)/AStarMatch.Po
 	-rm -f ./$(DEPDIR)/Parameter.Po

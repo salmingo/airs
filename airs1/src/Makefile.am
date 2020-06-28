@@ -1,6 +1,6 @@
 bin_PROGRAMS=airs1
 airs1_SOURCES=Parameter.cpp AMath.cpp ADIReduct.cpp ADIProcess.cpp ProjectTNX.hpp AStarMatch.cpp \
-              airs.cpp
+              AFindPV.cpp airs.cpp
 
 if DEBUG
   AM_CFLAGS = -g3 -O0 -Wall -DNDEBUG

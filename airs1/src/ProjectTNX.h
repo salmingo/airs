@@ -49,13 +49,25 @@ void chebyshev_array(double value, double min, double max, int order, double *pt
 	for (int i = 2; i < order; ++i) ptr[i] = 2 * norm * ptr[i - 1] - ptr[i - 2];
 }
 
+/*!
+ * @brief 球面大圆距离
+ * @param (l1, b1)  I的球面坐标, 量纲: 弧度
+ * @param (l2, b2)  II的球面坐标, 量纲: 弧度
+ * @return
+ * 球面大圆距离, 量纲: 弧度
+ */
+double sphere_range(double l1, double b1, double l2, double b2) {
+	double x = cos(b1) * cos(b2) * cos(l1 - l2) + sin(b1) * sin(b2);
+	return acos(x);
+}
+
 //////////////////////////////////////////////////////////////////////////////
 /** 数据类型 **/
 enum {//< 函数基类型
 	TNX_MIN,		//< 限定
-	TNX_POWER,			//< 幂函数
-	TNX_LEGENDRE,		//< 勒让德
-	TNX_CHEBYSHEV,		//< 契比雪夫
+	TNX_POWER,		//< 幂函数
+	TNX_LEGENDRE,	//< 勒让德
+	TNX_CHEBYSHEV,	//< 契比雪夫
 	TNX_MAX			//< 限定
 };
 
@@ -66,23 +78,20 @@ enum {//< 多项式交叉系数类型
 	X_HALF,		//< 半交叉
 	X_MAX	//< 限定
 };
-
 //////////////////////////////////////////////////////////////////////////////
-class ProjectTNX {
-protected:
-	typedef void (*FunctionBase)(double, double, double, int, double *);
-
-	/*! 成员变量 !*/
-protected:
-	/* 拟合参数 */
-	int functyp;	//< 函数基类型
+/*!
+ * @function AFitFunc 天文常用拟合函数通用定义
+ */
+typedef void (*AFitFunc)(double, double, double, int, double *);
+/*!
+ * @struct tnxres_model TNX投影修正残差模型
+ */
+struct tnxres_model {
 	int xterm;		//< 交叉项类型
 	int xorder;		// X轴最高阶次
 	int yorder;		//< Y轴最高阶次
 	int nitem;		//< 基函数数量
-	FunctionBase basefunc;	//< 基函数
-
-	bool xyref_auto;	//< XY参考点坐标采用自动统计值
+	AFitFunc basefunc;	//< 基函数
 	/*!
 	 * @var xmin, ymin; xmax, ymax : 归一化范围
 	 */
@@ -92,53 +101,65 @@ protected:
 	double *xitem;	//< 由X轴自变量生成的一元数组
 	double *yitem;	//< 由Y轴自变量生成的一元数组
 
-	ImgFrmPtr frame;	//< 帧图像数据
-
 public:
-	/* 拟合结果 */
-	PT2F crval;			//< 参考点对应的天球坐标
-	PT2F crpix;			//< 参考点对应的XY坐标
-	double cd[2][2];	//< 旋转矩阵
-	double ccd[2][2];	//< 逆旋转矩阵
-	double scale;		//< X方向像元比例尺, 量纲: 角秒/像素
-	double rotation;	//< X方向正向与WCS X'正向的旋转角, 量纲: 角度
-	double errfit;		//< 拟合残差, 量纲: 角秒
-
-public:
-	virtual ~ProjectTNX() {
+	virtual ~tnxres_model() {
 		free_array(&coef);
 		free_array(&xitem);
 		free_array(&yitem);
 	}
 
-protected:
+public:
 	/*!
-	 * @brief 释放为数组分配的内存
+	 * @brief 设置归一化范围
+	 * @param x1  X最小值
+	 * @param y1  Y最小值
+	 * @param x2  X最大值
+	 * @param y2  Y最大值
 	 */
-	void free_array(double **ptr) {
-		if (*ptr) {
-			delete [](*ptr);
-			*ptr = NULL;
-		}
+	void SetNormalRange(int x1, int y1, int x2, int y2) {
+		xmin = x1, ymin = y1;
+		xmax = x2, ymax = y2;
 	}
 
 	/*!
-	 * @brief 计算系数数量==数列模数
+	 * @brief 设置拟合模型参数
+	 * @param func     函数基类型
+	 * @param xterm    交叉项类型
+	 * @param xorder   X轴最高阶次
+	 * @param yorder   Y轴最高阶次
 	 */
-	int xterm_count(int xterm, int xorder, int yorder) {
-		int n;
+	void SetFitParam(int func, int xterm, int xorder, int yorder) {
 		int order = xorder < yorder ? xorder : yorder;
-		if      (xterm == X_NONE)  n = xorder + yorder - 1;
-		else if (xterm == X_FULL)  n = xorder * yorder;
-		else if (xterm == X_HALF)  n = xorder * yorder - order * (order - 1) / 2;
-		return n;
+		int n(nitem);
+
+		if      (func == TNX_POWER)     basefunc = &power_array;
+		else if (func == TNX_LEGENDRE)  basefunc = &legendre_array;
+		else if (func == TNX_CHEBYSHEV) basefunc = &chebyshev_array;
+		n = xterm_count();
+		if (this->xorder != xorder) {
+			free_array(&xitem);
+			xitem = new double[xorder];
+		}
+		if (this->yorder != yorder) {
+			free_array(&yitem);
+			yitem = new double[yorder];
+		}
+		if (nitem != n) {
+			free_array(&coef);
+			coef = new double[n];
+		}
+
+		nitem         = n;
+		this->xterm   = xterm;
+		this->xorder  = xorder;
+		this->yorder  = yorder;
 	}
 
 	/*!
 	 * @brief 为系数拟合生成X方向矢量
 	 * @param ptr 矢量存储空间
 	 */
-	void poly_vector(double x, double y, double *ptr) {
+	void FitVector(double x, double y, double *ptr) {
 		int maxorder = xorder > yorder ? xorder : yorder;
 		int i, j, k, imax(xorder);
 		double t;
@@ -157,10 +178,11 @@ protected:
 	}
 
 	/*!
-	 * @brief 计算改正项
-	 * @param ptr 矢量存储空间
+	 * @brief 由模型计算残差
+	 * @param x  X坐标
+	 * @param y  Y坐标
 	 */
-	double poly_val(double x, double y) {
+	double ModelValue(double x, double y) {
 		int maxorder = xorder > yorder ? xorder : yorder;
 		int i, j, k, imax(xorder);
 		double sum1, sum, t;
@@ -180,6 +202,49 @@ protected:
 		return sum;
 	}
 
+protected:
+	/*!
+	 * @brief 释放为数组分配的内存
+	 */
+	void free_array(double **ptr) {
+		if (*ptr) {
+			delete [](*ptr);
+			*ptr = NULL;
+		}
+	}
+
+	/*!
+	 * @brief 计算系数数量==数列模数
+	 */
+	int xterm_count() {
+		int n;
+		int order = xorder < yorder ? xorder : yorder;
+		if      (xterm == X_NONE)  n = xorder + yorder - 1;
+		else if (xterm == X_FULL)  n = xorder * yorder;
+		else if (xterm == X_HALF)  n = xorder * yorder - order * (order - 1) / 2;
+		return n;
+	}
+};
+//////////////////////////////////////////////////////////////////////////////
+class ProjectTNX {
+protected:
+	/*! 成员变量 !*/
+	/* 拟合参数 */
+	bool xyref_auto;	//< XY参考点坐标采用自动统计值
+	ImgFrmPtr frame;	//< 帧图像数据
+
+public:
+	/* 拟合结果 */
+	PT2F crval;			//< 参考点对应的天球坐标, 量纲: 弧度
+	PT2F crpix;			//< 参考点对应的XY坐标
+	double cd[2][2];	//< 旋转矩阵, 量纲: 弧度/像素
+	double ccd[2][2];	//< 逆旋转矩阵, 量纲: 像素/弧度
+	tnxres_model res[2];//< 残差修正模型
+	double scale;		//< X方向像元比例尺, 量纲: 角秒/像素
+	double rotation;	//< X方向正向与WCS X'正向的旋转角, 量纲: 角度
+	double errfit;		//< 拟合残差, 量纲: 角秒
+
+protected:
 	/*!
 	 * @brief 球面投影到平面, TAN
 	 * @note
@@ -191,6 +256,10 @@ protected:
 		eta = (cos(D0) * sin(D) - sin(D0) * cos(D) * cos(A - A0)) / fract;
 	}
 
+	void sphere2plane(double A, double D, double &xi, double &eta) {
+		sphere2plane(crval.x, crval.y, A, D, xi, eta);
+	}
+
 	/*!
 	 * @brief 投影平面坐标变换至图像坐标
 	 * @note
@@ -199,6 +268,10 @@ protected:
 	void plane2image(double xi, double eta, double x0, double y0, double &x, double &y) {
 		x = (ccd[0][0] * xi + ccd[0][1] * eta) + x0;
 		y = (ccd[1][0] * xi + ccd[1][1] * eta) + y0;
+	}
+
+	void plane2image(double xi, double eta, double &x, double &y) {
+		plane2image(xi, eta, crpix.x, crpix.y, x, y);
 	}
 
 	/*!
@@ -212,6 +285,10 @@ protected:
 		eta = cd[1][0] * dx + cd[1][1] * dy;
 	}
 
+	void image2plane(double x, double y, double &xi, double &eta) {
+		image2plane(crpix.x, crpix.y, x, y, xi, eta);
+	}
+
 	/*!
 	 * @brief 平面投影到球面, TAN
 	 * @note
@@ -221,6 +298,10 @@ protected:
 		double fract = cos(D0) - eta * sin(D0);
 		A = cyclemod(A0 + atan2(xi, fract), A2PI);
 		D = atan(((eta * cos(D0) + sin(D0)) * cos(A - A0)) / fract);
+	}
+
+	void plane2sphere(double xi, double eta, double &A, double &D) {
+		plane2sphere(crval.x, crval.y, xi, eta, A, D);
 	}
 
 public:
@@ -242,31 +323,8 @@ public:
 		if (xterm <= X_MIN || xterm >= X_MAX) return -2;
 		if (xorder < 2 || xorder > 10) return -3;
 		if (yorder < 2 || yorder > 10) return -4;
-		int order = xorder < yorder ? xorder : yorder;
-		int n(nitem);
-
-		if      (func == TNX_POWER)     basefunc = &power_array;
-		else if (func == TNX_LEGENDRE)  basefunc = &legendre_array;
-		else if (func == TNX_CHEBYSHEV) basefunc = &chebyshev_array;
-		n = xterm_count(xterm, xorder, yorder);
-		if (this->xorder != xorder) {
-			free_array(&xitem);
-			xitem = new double[xorder];
-		}
-		if (this->yorder != yorder) {
-			free_array(&yitem);
-			yitem = new double[yorder];
-		}
-		if (nitem != n) {
-			free_array(&coef);
-			coef = new double[n];
-		}
-
-		functyp       = func;
-		nitem         = n;
-		this->xterm   = xterm;
-		this->xorder  = xorder;
-		this->yorder  = yorder;
+		res[0].SetFitParam(func, xterm, xorder, yorder);
+		res[1].SetFitParam(func, xterm, xorder, yorder);
 		return 0;
 	}
 
@@ -281,16 +339,13 @@ public:
 	 * @note
 	 * 默认归一化范围是: (0, 0)<->(wimg - 1, himg - 1)
 	 */
-	void SetRefXY(int x1, int y1, int x2, int y2, double x0 = 0.0, double y0 = 0.0) {
-		xmin = x1, ymin = y1;
-		xmax = x2, ymax = y2;
+	void SetRefXY(int x1, int y1, int x2, int y2, double x0 = -1.0, double y0 = -1.0) {
+		res[0].SetNormalRange(x1, y1, x2, y2);
+		res[1].SetNormalRange(x1, y1, x2, y2);
 
-		if (x0 < x1 || x0 > x1 || y0 < y1 || y0 > y1) xyref_auto = true;
-		else {
-			xyref_auto = false;
-			crpix.x = x0;
-			crpix.y = y0;
-		}
+		xyref_auto = x0 < x1 || x0 > x1 || y0 < y1 || y0 > y1;
+		crpix.x    = xyref_auto ? (x1 + x2) * 0.5 : x0;
+		crpix.y    = xyref_auto ? (y1 + y2) * 0.5 : y0;
 	}
 
 	/*!
@@ -299,6 +354,24 @@ public:
 	 * 拟合结果
 	 */
 	bool ProcessFit();
+	/*!
+	 * @brief 使用WCS模型, 计算XY对应的天球坐标
+	 * @param (x, y)  XY坐标
+	 * @param (l, b)  天球坐标
+	 */
+	void XY2RD(double x, double y, double &l, double &b);
+	/*!
+	 * @brief 使用WCS模型, 计算XY对应的天球坐标
+	 * @param xy  XY坐标
+	 * @param rd  天球/赤道坐标
+	 */
+	void XY2RD(const PT2F &xy, PT2F &rd);
+	/*!
+	 * @brief 使用WCS模型, 计算与天球坐标对应的XY坐标
+	 * @param rd  天球/赤道坐标
+	 * @param xy  XY坐标
+	 */
+	void RD2XY(const PT2F &rd, PT2F &xy);
 
 protected:
 	/*!
@@ -320,6 +393,18 @@ protected:
 	 * - crval_auto的量纲是弧度
 	 */
 	bool try_fit(const PT2F &refxy, const PT2F &refrd);
+	/*!
+	 * @brief 拟合后的统计
+	 */
+	void final_fit();
+	/*!
+	 * @brief 使用WCS模型, 计算XY对应的天球坐标
+	 * @param refx/y  参考点XY坐标
+	 * @param refl/b  参考点天球坐标
+	 * @param x/y     目标的XY坐标
+	 * @param l/b     目标的天球坐标
+	 */
+	void xy2rd(double refx, double refy, double refl, double refb, double x, double y, double &l, double b);
 	/*!
 	 * @brief 使用WCS模型, 计算XY对应的天球坐标
 	 * @param xy  XY坐标
