@@ -172,9 +172,56 @@ void AFindPV::candidate2object(PvCanPtr can) {
 	PvPtVec & pts = can->pts;
 	PvObjPtr obj = boost::make_shared<PvObj>();
 	PvPtVec &npts = obj->pts;
-	for (PvPtVec::iterator it = pts.begin(); it != pts.end(); ++it) npts.push_back(*it);
-	upload_orbit(obj);
-	save_gtw_orbit(obj);
+	/*---------- 过滤噪点和恒星: 2020-06 ----------*/
+	/*
+	 * - XY位置变化小于阈值: 1pix. 此判据认为在无闭环前提下, 跟踪精度不会好于1pix
+	 * - 赤经运动距离与恒星速度的偏差小于阈值, 且赤纬偏差小于阈值, 阈值暂定为5角秒. 适用于静止模式下错误识别的恒星
+	 *
+	 * 过滤算法缺陷: 不能剔除跟踪模式下的热噪声
+	 * - 暂: 适当提高信噪比, 以提高置信度
+	 */
+	bool noise(false);
+	int n = pts.size();
+	double x, y, dx, dy;
+	double xmin(1E30), xmax(0.0), ymin(1E30), ymax(0.0);
+	double dr = fabs(pts[n-1]->ra - pts[0]->ra);
+	double dd = fabs(pts[n-1]->dc - pts[0]->dc) * D2AS;
+	double dt = (pts[n-1]->mjd - pts[0]->mjd) * DAYSEC * 15.0; // 15.04108: 地球自转速度
+
+	if (fabs(dr) > 180.0) dr = 360.0 - dr;
+	dr *= D2AS;
+	x = pts[0]->x, y = pts[0]->y;
+	for (int i = 1; i < n; ++i) {
+		dx = fabs(pts[i]->x - x);
+		dy = fabs(pts[i]->y - y);
+		x = pts[i]->x;
+		y = pts[i]->y;
+
+		if (xmin > dx) xmin = dx;
+		if (xmax < dx) xmax = dx;
+		if (ymin > dy) ymin = dy;
+		if (ymax < dy) ymax = dy;
+	}
+	if ((xmax - xmin) <= 3.0 && (ymax - ymin) <= 3.0) {
+		dx = fabs(pts[n - 1]->x - pts[0]->x);
+		dy = fabs(pts[n - 1]->y - pts[0]->y);
+		if (dx <= 3.0 && dy <= 3.0) noise = true;
+	}
+	else if (dd < 10.0 && dr < dt) noise = true;
+	/*------------------------------------------------------------*/
+	if (!noise) {
+		ptime tmmid;
+		double tread(125.0);
+		double lines(4096.0);
+		double tline = tread / lines;
+		for (PvPtVec::iterator it = pts.begin(); it != pts.end(); ++it) {
+			tmmid = from_iso_extended_string((*it)->tmmid) + millisec(int(((*it)->y * tline)));
+			(*it)->tmmid = to_iso_extended_string(tmmid);
+			npts.push_back(*it);
+		}
+		upload_orbit(obj);
+		save_gtw_orbit(obj);
+	}
 }
 
 void AFindPV::create_dir(FramePtr frame) {

@@ -21,46 +21,16 @@
 #ifndef SRC_PROJECTTNX_H_
 #define SRC_PROJECTTNX_H_
 
+#include <boost/smart_ptr.hpp>
 #include "ADefine.h"
 #include "ADIData.h"
 
 namespace AstroUtil {
 //////////////////////////////////////////////////////////////////////////////
-void power_array(double value, double min, double max, int order, double *ptr) {
-	ptr[0] = 1.0;
-	for (int i = 1; i < order; ++i) ptr[i] = value * ptr[i - 1];
-}
-
-void legendre_array(double value, double min, double max, int order, double *ptr) {
-	double norm = ((max + min) - 2 * value) / (max - min);
-
-	ptr[0] = 1.0;
-	if (order > 1) ptr[1] = norm;
-	for (int i = 2; i < order; ++i) {
-		ptr[i] = ((2 * i - 1) * norm * ptr[i - 1] - (i - 1) * ptr[i - 2]) / i;
-	}
-}
-
-void chebyshev_array(double value, double min, double max, int order, double *ptr) {
-	double norm = ((max + min) - 2 * value) / (max - min);
-
-	ptr[0] = 1.0;
-	if (order > 1) ptr[1] = norm;
-	for (int i = 2; i < order; ++i) ptr[i] = 2 * norm * ptr[i - 1] - ptr[i - 2];
-}
-
-/*!
- * @brief 球面大圆距离
- * @param (l1, b1)  I的球面坐标, 量纲: 弧度
- * @param (l2, b2)  II的球面坐标, 量纲: 弧度
- * @return
- * 球面大圆距离, 量纲: 弧度
- */
-double sphere_range(double l1, double b1, double l2, double b2) {
-	double x = cos(b1) * cos(b2) * cos(l1 - l2) + sin(b1) * sin(b2);
-	return acos(x);
-}
-
+extern void power_array(double value, double min, double max, int order, double *ptr);
+extern void legendre_array(double value, double min, double max, int order, double *ptr);
+extern void chebyshev_array(double value, double min, double max, int order, double *ptr);
+extern double sphere_range(double l1, double b1, double l2, double b2);
 //////////////////////////////////////////////////////////////////////////////
 /** 数据类型 **/
 enum {//< 函数基类型
@@ -129,30 +99,27 @@ public:
 	 * @param yorder   Y轴最高阶次
 	 */
 	void SetFitParam(int func, int xterm, int xorder, int yorder) {
-		int order = xorder < yorder ? xorder : yorder;
 		int n(nitem);
 
+		this->xterm = xterm;
 		if      (func == TNX_POWER)     basefunc = &power_array;
 		else if (func == TNX_LEGENDRE)  basefunc = &legendre_array;
 		else if (func == TNX_CHEBYSHEV) basefunc = &chebyshev_array;
-		n = xterm_count();
 		if (this->xorder != xorder) {
 			free_array(&xitem);
 			xitem = new double[xorder];
+			this->xorder = xorder;
 		}
 		if (this->yorder != yorder) {
 			free_array(&yitem);
 			yitem = new double[yorder];
+			this->yorder = yorder;
 		}
-		if (nitem != n) {
+		if (nitem != (n = xterm_count())) {
 			free_array(&coef);
-			coef = new double[n];
+			coef  = new double[n];
+			nitem = n;
 		}
-
-		nitem         = n;
-		this->xterm   = xterm;
-		this->xorder  = xorder;
-		this->yorder  = yorder;
 	}
 
 	/*!
@@ -173,7 +140,7 @@ public:
 				else if (xterm == X_HALF && (j + xorder) > maxorder) --imax;
 			}
 
-			for (i = 0, t = yitem[j]; i < imax; ++i, ++k) ptr[k] =  xitem[i] * t;
+			for (i = 0, t = yitem[j]; i < imax; ++i, ++k) ptr[k] = xitem[i] * t;
 		}
 	}
 
@@ -217,7 +184,7 @@ protected:
 	 * @brief 计算系数数量==数列模数
 	 */
 	int xterm_count() {
-		int n;
+		int n(0);
 		int order = xorder < yorder ? xorder : yorder;
 		if      (xterm == X_NONE)  n = xorder + yorder - 1;
 		else if (xterm == X_FULL)  n = xorder * yorder;
@@ -230,8 +197,8 @@ class ProjectTNX {
 protected:
 	/*! 成员变量 !*/
 	/* 拟合参数 */
-	bool xyref_auto;	//< XY参考点坐标采用自动统计值
-	ImgFrmPtr frame;	//< 帧图像数据
+	bool xyref_auto_;	//< XY参考点坐标采用自动统计值
+	ImgFrmPtr frame_;	//< 帧图像数据
 
 public:
 	/* 拟合结果 */
@@ -281,7 +248,7 @@ protected:
 	 */
 	void image2plane(double x0, double y0, double x, double y, double &xi, double &eta) {
 		double dx(x - x0), dy(y - y0);
-		xi  = cd[0][1] * dx + cd[0][1] * dy;
+		xi  = cd[0][0] * dx + cd[0][1] * dy;
 		eta = cd[1][0] * dx + cd[1][1] * dy;
 	}
 
@@ -343,9 +310,9 @@ public:
 		res[0].SetNormalRange(x1, y1, x2, y2);
 		res[1].SetNormalRange(x1, y1, x2, y2);
 
-		xyref_auto = x0 < x1 || x0 > x1 || y0 < y1 || y0 > y1;
-		crpix.x    = xyref_auto ? (x1 + x2) * 0.5 : x0;
-		crpix.y    = xyref_auto ? (y1 + y2) * 0.5 : y0;
+		xyref_auto_ = x0 < x1 || x0 > x1 || y0 < y1 || y0 > y1;
+		crpix.x    = xyref_auto_ ? (x1 + x2) * 0.5 : x0;
+		crpix.y    = xyref_auto_ ? (y1 + y2) * 0.5 : y0;
 	}
 
 	/*!
@@ -353,7 +320,7 @@ public:
 	 * @return
 	 * 拟合结果
 	 */
-	bool ProcessFit();
+	bool ProcessFit(ImgFrmPtr frame);
 	/*!
 	 * @brief 使用WCS模型, 计算XY对应的天球坐标
 	 * @param (x, y)  XY坐标
@@ -404,7 +371,7 @@ protected:
 	 * @param x/y     目标的XY坐标
 	 * @param l/b     目标的天球坐标
 	 */
-	void xy2rd(double refx, double refy, double refl, double refb, double x, double y, double &l, double b);
+	void xy2rd(double refx, double refy, double refl, double refb, double x, double y, double &l, double &b);
 	/*!
 	 * @brief 使用WCS模型, 计算XY对应的天球坐标
 	 * @param xy  XY坐标
@@ -412,6 +379,7 @@ protected:
 	 */
 	void xy2rd(const PT2F &refxy, const PT2F &refrd, const PT2F &xy, PT2F &rd);
 };
+typedef boost::shared_ptr<ProjectTNX> PrjTNXPtr;
 //////////////////////////////////////////////////////////////////////////////
 } /* namespace AstroUtil */
 

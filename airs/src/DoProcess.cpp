@@ -164,7 +164,10 @@ bool DoProcess::check_image(FramePtr frame) {
 		if (!datefull) sprintf(tmfull, "%sT%s", dateobs, timeobs);
 		frame->tmobs = datefull ? dateobs : tmfull;
 		ptime tmobs  = from_iso_extended_string(frame->tmobs);
-		ptime tmmid  = tmobs + millisec(int(expdur * 500.0 + 0.36)); // 0.36: rolling cmos ??
+		// QHY CMOS 4040的两个时标(毫秒)
+		// 300: 曝光指令执行延迟
+		// 125: 读出时间延迟
+		ptime tmmid  = tmobs + millisec(int(expdur * 500.0) + 300);
 		frame->tmmid = to_iso_extended_string(tmmid);
 		frame->secofday = tmmid.time_of_day().total_milliseconds() / 86400000.0;
 		frame->mjd      = tmmid.date().modjulian_day() + frame->secofday;

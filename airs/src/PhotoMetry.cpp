@@ -106,7 +106,7 @@ bool PhotoMetry::do_match() {
 	double x, y;
 
 	t = (mid.date().modjulian_day() + mid.time_of_day().total_seconds() / 86400.0 - 51544.5) / 365.25;
-	t = t * 1E-4 / 3600.0;
+	t = t * 1E-4;	// 0.1毫角秒转换为角秒
 
 	for (i = n1 = n2 = 0; i < n0; ++i) {
 		obj = objs[i];
