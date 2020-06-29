@@ -211,8 +211,8 @@ void ProjectTNX::final_fit() {
 			esq  += (t * t);
 			++n;
 
-			nfobj[i].ra_fit  = radc.x * R2D;
-			nfobj[i].dec_fit = radc.y * R2D;
+			nfobj[i].ra_inst  = radc.x * R2D;
+			nfobj[i].dec_inst = radc.y * R2D;
 		}
 	}
 	errfit = sqrt((esq - esum * esum / n) / n) * R2AS;

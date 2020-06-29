@@ -7,7 +7,6 @@
 
 #include <math.h>
 #include <string.h>
-#include <strings.h>
 #include <stdio.h>
 #include "ADefine.h"
 #include "AMath.h"
@@ -30,8 +29,8 @@ bool AMath::LSFitLinear(int m, int n, double *x, double *y, double *c) {
 	double *L, *R, *Aptr, *Yptr, t;
 	int i, j, k;
 
-	bzero(A, sizeof(double) * n * n);
-	bzero(Y, sizeof(double) * n);
+	memset(A, 0, sizeof(double) * n * n);
+	memset(Y, 0, sizeof(double) * n);
 
 	for (i = 0, Aptr = A, Yptr = Y; i < n; ++i, ++Yptr) {
 		// 构建矩阵A
@@ -176,7 +175,7 @@ bool AMath::MatrixInvert(int n, double *a) {
 	int i;
 	bool rslt(false);
 
-	bzero(y, sizeof(double) * n2);
+	memset(y, 0, sizeof(double) * n2);
 	for (i = 0, yptr = y; i < n; ++i, yptr += (n + 1)) *yptr = 1.0;
 	if (LUdcmp(n, a)) {
 		LUsolve(n, y, y);
