@@ -77,6 +77,8 @@ public:
 	const char *GetErrmsg();
 	/*!
 	 * @brief 上传一条观测计划
+	 * @param gid      组编号
+	 * @param uid      单元编号
 	 * @param plan_sn  计划编号
 	 * @param mode     计划类型
 	 * @param btime    起始时间, 格式: CCYYMMDDThhmmss.sss
@@ -84,7 +86,7 @@ public:
 	 * @return
 	 * 传输结果
 	 */
-	int UploadObsPlan(const string &plan_sn, int mode, const string &btime, const string &etime);
+	int UploadObsPlan(const string &gid, const string &uid, const string &plan_sn, int mode, const string &btime, const string &etime);
 	/*!
 	 * @brief 上传观测计划工作状态
 	 * @param plan_sn  计划编号
@@ -172,6 +174,8 @@ public:
 	int UpdateRainfall(const string &gid, const string &utc, bool rainy);
 	/*!
 	 * @brief 注册并上传FITS文件
+	 * @param gid       组编号
+	 * @param uid       单元编号
 	 * @param cid       相机编号
 	 * @param filename  文件名
 	 * @param pathdir   文件目录
@@ -180,7 +184,8 @@ public:
 	 * @return
 	 * 传输结果
 	 */
-	int RegImageFile(const string &cid, const string &filename, const string &pathdir, const string &tmobs, int microsec);
+	int RegImageFile(const string &gid, const string &uid, const string &cid,
+			const string &filename, const string &pathdir, const string &tmobs, int microsec);
 	/*!
 	 * @brief 上传单帧图像中识别的候选体
 	 * @param filepath  文件路径

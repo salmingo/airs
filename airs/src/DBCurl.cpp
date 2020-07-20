@@ -125,9 +125,11 @@ const char *DBCurl::GetErrmsg() {
 	return errmsg_;
 }
 
-int DBCurl::UploadObsPlan(const string &plan_sn, int mode, const string &btime, const string &etime) {
+int DBCurl::UploadObsPlan(const string &gid, const string &uid, const string &plan_sn, int mode, const string &btime, const string &etime) {
 	mmapstr kvs, file;
 
+	kvs.insert(pairstr("gid",       gid));
+	kvs.insert(pairstr("uid",       uid));
 	kvs.insert(pairstr("opSn",      plan_sn));
 	kvs.insert(pairstr("obsType",   to_string(mode)));
 	kvs.insert(pairstr("beginTime", btime));
@@ -138,7 +140,7 @@ int DBCurl::UploadObsPlan(const string &plan_sn, int mode, const string &btime, 
 int DBCurl::UploadObsplanState(const string &plan_sn, const string &state, const string &utc) {
 	mmapstr kvs, file;
 
-	kvs.insert(pairstr("opId",  plan_sn));
+	kvs.insert(pairstr("opSn",  plan_sn));
 	kvs.insert(pairstr("state", state));
 	kvs.insert(pairstr("ctime", utc));
 
@@ -196,9 +198,9 @@ int DBCurl::UpdateCameraState(const string &gid, const string &uid, const string
 		int state, int errcode, float coolget) {
 	mmapstr kvs, file;
 
-	kvs.insert(pairstr("groupId",   gid));
-	kvs.insert(pairstr("unitId",    uid));
-	kvs.insert(pairstr("camId",     cid));
+	kvs.insert(pairstr("gid",       gid));
+	kvs.insert(pairstr("uid",       uid));
+	kvs.insert(pairstr("cid",       cid));
 	kvs.insert(pairstr("utc",       utc));
 	kvs.insert(pairstr("state",     to_string(state)));
 	kvs.insert(pairstr("errcode",   to_string(errcode)));
@@ -228,10 +230,13 @@ int DBCurl::UpdateRainfall(const string &gid, const string &utc, bool rainy) {
 	return curl_upload(urlRainfall_, kvs, file, string(""));
 }
 
-int DBCurl::RegImageFile(const string &cid, const string &filename, const string &filepath, const string &tmobs, int microsec) {
+int DBCurl::RegImageFile(const string &gid, const string &uid, const string &cid,
+		const string &filename, const string &filepath, const string &tmobs, int microsec) {
 	mmapstr kvs, file;
 
-	kvs.insert (pairstr("camId",        cid));
+	kvs.insert (pairstr("gid",          gid));
+	kvs.insert (pairstr("uid",          uid));
+	kvs.insert (pairstr("cid",          cid));
 	kvs.insert (pairstr("imgName",      filename));
 	kvs.insert (pairstr("imgPath",      filepath));
 	kvs.insert (pairstr("genTime",      tmobs));
