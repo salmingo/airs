@@ -143,7 +143,6 @@ int DBCurl::UploadObsplanState(const string &plan_sn, const string &state, const
 	kvs.insert(pairstr("opSn",  plan_sn));
 	kvs.insert(pairstr("state", state));
 	kvs.insert(pairstr("ctime", utc));
-
 	return curl_upload(urlObsplanState_, kvs, file, string(""));
 }
 
@@ -153,7 +152,6 @@ int DBCurl::UpdateMountLinked(const string &gid, const string &uid, bool linked)
 	kvs.insert(pairstr("gid",     gid));
 	kvs.insert(pairstr("uid",     uid));
 	kvs.insert(pairstr("linked",  to_string(linked)));
-
 	return curl_upload(urlMountLinked_, kvs, file, string(""));
 }
 
@@ -164,7 +162,6 @@ int DBCurl::UpdateCameraLinked(const string &gid, const string &uid, const strin
 	kvs.insert(pairstr("uid",     uid));
 	kvs.insert(pairstr("cid",     cid));
 	kvs.insert(pairstr("linked",  to_string(linked)));
-
 	return curl_upload(urlCameraLinked_, kvs, file, string(""));
 }
 
@@ -173,7 +170,6 @@ int DBCurl::UpdateDomeLinked(const string &gid, bool linked) {
 
 	kvs.insert(pairstr("gid",     gid));
 	kvs.insert(pairstr("linked",  to_string(linked)));
-
 	return curl_upload(urlDomeLinked_, kvs, file, string(""));
 }
 
@@ -190,7 +186,6 @@ int DBCurl::UpdateMountState(const string &gid, const string &uid, const string 
 	kvs.insert(pairstr("dec",     to_string(dec)));
 	kvs.insert(pairstr("azi",     to_string(azi)));
 	kvs.insert(pairstr("alt",     to_string(alt)));
-
 	return curl_upload(urlMountState_, kvs, file, string(""));
 }
 
@@ -205,7 +200,6 @@ int DBCurl::UpdateCameraState(const string &gid, const string &uid, const string
 	kvs.insert(pairstr("state",     to_string(state)));
 	kvs.insert(pairstr("errcode",   to_string(errcode)));
 	kvs.insert(pairstr("coolget",   to_string(coolget)));
-
 	return curl_upload(urlCameraState_, kvs, file, string(""));
 }
 
@@ -216,7 +210,6 @@ int DBCurl::UpdateDomeState(const string &gid, const string &utc, int state, int
 	kvs.insert(pairstr("utc",     utc));
 	kvs.insert(pairstr("state",   to_string(state)));
 	kvs.insert(pairstr("errcode", to_string(errcode)));
-
 	return curl_upload(urlDomeState_, kvs, file, string(""));
 }
 
@@ -226,7 +219,6 @@ int DBCurl::UpdateRainfall(const string &gid, const string &utc, bool rainy) {
 	kvs.insert(pairstr("gid",    gid));
 	kvs.insert(pairstr("utc",    utc));
 	kvs.insert(pairstr("value",  to_string(rainy)));
-
 	return curl_upload(urlRainfall_, kvs, file, string(""));
 }
 
@@ -242,7 +234,6 @@ int DBCurl::RegImageFile(const string &gid, const string &uid, const string &cid
 	kvs.insert (pairstr("genTime",      tmobs));
 	kvs.insert (pairstr("microSecond",  to_string(microsec)));
 	file.insert(pairstr("fileUpload",   filename));
-
 	return curl_upload(urlRegImage_, kvs, file, filepath);
 }
 
@@ -251,7 +242,6 @@ int DBCurl::UploadFrameOT(const string &filepath, const string &filename) {
 
 	kvs.insert (pairstr("fileType",   "crsot1"));
 	file.insert(pairstr("fileUpload", filename));
-
 	return curl_upload(urlUploadFile_, kvs, file, filepath);
 }
 
