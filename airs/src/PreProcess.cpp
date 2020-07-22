@@ -7,12 +7,10 @@
 
 #include "PreProcess.h"
 
-PreProcess::PreProcess() {
-	// TODO Auto-generated constructor stub
-
+PreProcess::PreProcess(Parameter *param) {
+	param_ = param;
 }
 
 PreProcess::~PreProcess() {
-	// TODO Auto-generated destructor stub
-}
 
+}
