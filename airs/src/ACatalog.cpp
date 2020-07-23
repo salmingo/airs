@@ -28,9 +28,9 @@ void ACatalog::SetPathRoot(const char *pathdir) {
 	strcpy(m_pathCat, pathdir);
 }
 
-bool ACatalog::FindStar(double ra0, double dec0, double radius) {
+int ACatalog::FindStar(double ra0, double dec0, double radius) {
 	if (ra0 < 0 || ra0 > 360 || dec0 < -90 || dec0 > 90 || radius < 0.001)
-		return false;
+		return 0;
 	m_csb.new_seek(ra0, dec0, radius / 60.0);	// 计算搜索范围
 	return true;
 }

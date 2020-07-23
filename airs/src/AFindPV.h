@@ -235,6 +235,10 @@ public:
 protected:
 	/* 成员变量 */
 	Parameter *param_;	//< 配置参数
+	string gid_;		//< 组标志
+	string uid_;		//< 单元标志
+	string cid_;		//< 相机标志
+
 	int last_fno_;		//< 最后一个帧编号
 	PvFrmPtr frmprev_;	//< 帧数据
 	PvFrmPtr frmnow_;	//< 当前帧数据
@@ -333,6 +337,8 @@ protected:
 	void mag_convert(double mag, string &str);
 
 public:
+	void SetIDs(const string& gid, const string& uid, const string& cid);
+	bool IsMatched(const string& gid, const string& uid, const string& cid);
 	/*!
 	 * @brief 处理新的数据帧
 	 */

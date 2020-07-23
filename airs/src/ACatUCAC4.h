@@ -92,7 +92,7 @@ public:
 	 * @return
 	 * 已找到的恒星数据缓存区
 	 */
-	ucac4item_ptr GetResult(int &n);
+	ucac4item_ptr GetResult(int* n = NULL);
 	/*!
 	 * @brief 查找中心位置附近的恒星
 	 * @param ra0     中心赤经, 量纲: 角度

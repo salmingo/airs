@@ -20,17 +20,17 @@
 using std::string;
 using namespace AstroUtil;
 
-#define FAIL_IMGREDUCT		-1		//< 图像处理失败
-#define FAIL_ASTROMETRY		-2		//< 天文定位失败
-#define FAIL_PHOTOMETRY		-3		//< 流量定标失败
-#define SUCCESS_INIT		0x00	//< 初始化
-#define SUCCESS_COMPLETE	0x01	//< 完成处理流程
-#define SUCCESS_IMGREDUCT	0x02	//< 完成图像处理
-#define SUCCESS_ASTROMETRY	0x04	//< 完成天文定位
-#define SUCCESS_PHOTOMETRY	0x08	//< 完成流量定标
-#define PROCESS_IMGREDUCT	0x11	//< 执行图像处理
-#define PROCESS_ASTROMETRY	0x12	//< 执行天文定位
-#define PROCESS_PHOTOMETRY	0x13	//< 执行流量定标
+//#define FAIL_IMGREDUCT		-1		//< 图像处理失败
+//#define FAIL_ASTROMETRY		-2		//< 天文定位失败
+//#define FAIL_PHOTOMETRY		-3		//< 流量定标失败
+//#define SUCCESS_INIT		0x00	//< 初始化
+//#define SUCCESS_COMPLETE	0x01	//< 完成处理流程
+//#define SUCCESS_IMGREDUCT	0x02	//< 完成图像处理
+//#define SUCCESS_ASTROMETRY	0x04	//< 完成天文定位
+//#define SUCCESS_PHOTOMETRY	0x08	//< 完成流量定标
+//#define PROCESS_IMGREDUCT	0x11	//< 执行图像处理
+//#define PROCESS_ASTROMETRY	0x12	//< 执行天文定位
+//#define PROCESS_PHOTOMETRY	0x13	//< 执行流量定标
 
 enum {
 	NDX_X,
@@ -82,7 +82,7 @@ typedef std::vector<NFObjPtr> NFObjVec;
  * @struct OneFrame 单帧图像的特征信息
  */
 struct OneFrame {
-	int result;			//< 处理结果标志字
+//	int result;			//< 处理结果标志字
 	/* FITS文件 */
 	string filepath;	//< 文件路径
 	string filename;	//< 文件名
@@ -115,7 +115,7 @@ struct OneFrame {
 
 public:
 	OneFrame() {
-		result = SUCCESS_INIT;
+//		result = SUCCESS_INIT;
 		wimg = himg = 0;
 		fno  = 0;
 		secofday = 0;

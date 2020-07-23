@@ -49,6 +49,7 @@ void DoProcess::StopService() {
 	Stop();
 	interrupt_thread(thrd_reduct_);
 	interrupt_thread(thrd_astro_);
+	interrupt_thread(thrd_match_);
 	interrupt_thread(thrd_photo_);
 	interrupt_thread(thrd_reconn_gc_);
 	interrupt_thread(thrd_reconn_fileserver_);
@@ -87,19 +88,35 @@ void DoProcess::ImageReductResult(bool rslt) {
 
 void DoProcess::AstrometryResult(int rslt) {
 	FramePtr frame = astro_->GetFrame();
+	if (rslt) {// 匹配星表
+		mutex_lock lck(mtx_frm_match_);
+		queMatch_.push_back(frame);
+		cv_match_.notify_one();
+	}
+	cv_astro_.notify_one();
+}
+
+void DoProcess::MatchCatalogResult(bool rslt) {
+	FramePtr frame = match_->GetFrame();
 	if (rslt) {// 测光
 		mutex_lock lck(mtx_frm_photo_);
 		quePhoto_.push_back(frame);
 		cv_photo_.notify_one();
 	}
-	cv_astro_.notify_one();
+	cv_match_.notify_one();
 }
 
 void DoProcess::PhotometryResult(bool rslt) {
 	FramePtr frame = photo_->GetFrame();
 	if (rslt) {
 		logcal_->Write(frame); // 输出定标结果
-		finder_->NewFrame(frame);
+
+		FindPVPtr finder = get_finder(frame);
+		if (finder.use_count()) finder->NewFrame(frame);
+		else {
+			_gLog->Write(LOG_FAULT, NULL, "Not found FindPV for [%s:%s:%s]",
+					frame->gid.c_str(), frame->uid.c_str(), frame->cid.c_str());
+		}
 	}
 	cv_photo_.notify_one();
 }
@@ -109,19 +126,22 @@ void DoProcess::PhotometryResult(bool rslt) {
 void DoProcess::create_objects() {
 	reduct_  = boost::make_shared<AstroDIP>(&param_);
 	astro_   = boost::make_shared<AstroMetry>(&param_);
+	match_   = boost::make_shared<MatchCatalog>(&param_);
 	photo_   = boost::make_shared<PhotoMetry>(&param_);
-	finder_  = boost::make_shared<AFindPV>(&param_);
 
-	const AstroDIP::ReductResultSlot       &slot1 = boost::bind(&DoProcess::ImageReductResult, this, _1);
-	const AstroMetry::AstrometryResultSlot &slot2 = boost::bind(&DoProcess::AstrometryResult,  this, _1);
-	const PhotoMetry::PhotometryResultSlot &slot3 = boost::bind(&DoProcess::PhotometryResult,  this, _1);
+	const AstroDIP::ReductResultSlot        &slot1 = boost::bind(&DoProcess::ImageReductResult,   this, _1);
+	const AstroMetry::AstrometryResultSlot  &slot2 = boost::bind(&DoProcess::AstrometryResult,    this, _1);
+	const MatchCatalog::MatchResultSlot     &slot3 = boost::bind(&DoProcess::MatchCatalogResult,  this, _1);
+	const PhotoMetry::PhotometryResultSlot  &slot4 = boost::bind(&DoProcess::PhotometryResult,    this, _1);
 	reduct_->RegisterReductResult(slot1);
 	astro_->RegisterAstrometryResult(slot2);
-	photo_->RegisterPhotometryResult(slot3);
+	match_->RegisterMatchResult(slot3);
+	photo_->RegisterPhotometryResult(slot4);
 
 	thrd_reduct_.reset(new thread(boost::bind(&DoProcess::thread_reduct, this)));
-	thrd_astro_.reset(new thread(boost::bind(&DoProcess::thread_astro,   this)));
-	thrd_photo_.reset(new thread(boost::bind(&DoProcess::thread_photo,   this)));
+	thrd_astro_.reset (new thread(boost::bind(&DoProcess::thread_astro,  this)));
+	thrd_match_.reset (new thread(boost::bind(&DoProcess::thread_match,  this)));
+	thrd_photo_.reset (new thread(boost::bind(&DoProcess::thread_photo,  this)));
 
 	boost::this_thread::sleep_for(boost::chrono::milliseconds(500));
 }
@@ -171,8 +191,38 @@ bool DoProcess::check_image(FramePtr frame) {
 		frame->tmmid = to_iso_extended_string(tmmid);
 		frame->secofday = tmmid.time_of_day().total_milliseconds() / 86400000.0;
 		frame->mjd      = tmmid.date().modjulian_day() + frame->secofday;
+
+		if (frame->gid.empty() || frame->uid.empty() || frame->cid.empty()) {
+			_gLog->Write(LOG_FAULT, NULL, "File[%s] doesn't give right IDs[%s:%s:%s]",
+					frame->filename.c_str(),
+					frame->gid.c_str(), frame->uid.c_str(), frame->cid.c_str());
+			status = -1;
+		}
 	}
 	return (status == 0);
+}
+
+DoProcess::FindPVPtr DoProcess::get_finder(FramePtr frame) {
+	FindPVVec::iterator itend = finder_.end();
+	FindPVVec::iterator it;
+	string gid = frame->gid;
+	string uid = frame->uid;
+	string cid = frame->cid;
+	FindPVPtr finder;
+
+	for (it = finder_.begin(); it != itend; ++it) {
+		if ((*it)->IsMatched(gid, uid, cid)) {
+			finder = *it;
+			break;
+		}
+	}
+	if (!finder.use_count()) {
+		finder = boost::make_shared<AFindPV>();
+		finder->SetIDs(gid, uid, cid);
+		finder_.push_back(finder);
+	}
+
+	return finder;
 }
 
 void DoProcess::thread_reduct() {
@@ -205,6 +255,23 @@ void DoProcess::thread_astro() {
 			frame = queAstro_.front();
 			queAstro_.pop_front();
 			astro_->DoIt(frame);
+		}
+	}
+}
+
+void DoProcess::thread_match() {
+	boost::mutex mtx;
+	mutex_lock lck(mtx);
+
+	while (1) {
+		cv_match_.wait(lck);
+
+		while (!match_->IsWorking() && queMatch_.size()) {
+			mutex_lock lck1(mtx_frm_match_);
+			FramePtr frame;
+			frame = queMatch_.front();
+			queMatch_.pop_front();
+			match_->DoIt(frame);
 		}
 	}
 }

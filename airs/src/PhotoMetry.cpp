@@ -67,7 +67,7 @@ bool PhotoMetry::DoIt(FramePtr frame, double x0, double y0) {
 	frame_         = frame;
 	fullframe_     = false;
 	working_       = true;
-	frame_->result = PROCESS_PHOTOMETRY;
+//	frame_->result = PROCESS_PHOTOMETRY;
 
 	int size = param_->sizeNear;
 	if (!(size & 1)) ++size;
@@ -117,7 +117,7 @@ bool PhotoMetry::do_match() {
 		ra0 = obj->ra_fit;
 		dec0= obj->dec_fit;
 		if (ucac4_->FindStar(ra0, dec0, 0.5)) {// 搜索半径: 30角秒
-			stars = ucac4_->GetResult(n);
+			stars = ucac4_->GetResult(&n);
 			if (n == 1) {
 				++n1;
 				star  = stars;
@@ -277,6 +277,6 @@ void PhotoMetry::thread_match() {
 	}
 
 	working_ = false;
-	frame_->result = rslt ? SUCCESS_PHOTOMETRY : FAIL_PHOTOMETRY;
+//	frame_->result = rslt ? SUCCESS_PHOTOMETRY : FAIL_PHOTOMETRY;
 	rsltPhotometry_(rslt);
 }

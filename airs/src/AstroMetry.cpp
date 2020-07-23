@@ -73,7 +73,7 @@ bool AstroMetry::start_process() {
 	boost::format fmt1("%d"), fmt2("%.1f");
 	chdir("/usr/local/etc/sex-param");
 	execl(param_->pathAstrometry.c_str(), "solve-field", "--use-sextractor",
-		"-p", "-K", "-J", "-t", "3",
+		"-p", "-K", "-J",
 		"-L", (fmt2 % param_->scale_low).str().c_str(), "-H", (fmt2 % param_->scale_high).str().c_str(),
 		"-u", "app",
 		frame_->filepath.c_str(), NULL);

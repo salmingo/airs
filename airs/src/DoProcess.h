@@ -22,6 +22,7 @@
 #include "Parameter.h"
 #include "AstroDIP.h"
 #include "AstroMetry.h"
+#include "MatchCatalog.h"
 #include "PhotoMetry.h"
 #include "tcpasio.h"
 #include "DBCurl.h"
@@ -39,8 +40,10 @@ protected:
 	/* 数据类型 */
 	typedef boost::shared_ptr<AstroDIP> AstroDIPtr;
 	typedef boost::shared_ptr<AstroMetry> AstroMetryPtr;
+	typedef boost::shared_ptr<MatchCatalog> MatchCatPtr;
 	typedef boost::shared_ptr<PhotoMetry> PhotoMetryPtr;
 	typedef boost::shared_ptr<AFindPV> FindPVPtr;
+	typedef std::vector<FindPVPtr> FindPVVec;
 
 	enum {// 声明消息字
 		MSG_CONNECT_GC = MSG_USER,	//< 与总控服务器连接结果
@@ -61,19 +64,24 @@ protected:
 	/* 数据处理 */
 	boost::mutex mtx_frm_reduct_;	//< 互斥锁: 图像处理
 	boost::mutex mtx_frm_astro_;	//< 互斥锁: 天文定位
+	boost::mutex mtx_frm_match_;	//< 互斥锁: 匹配星表
 	boost::mutex mtx_frm_photo_;	//< 互斥锁: 测光
 	FrameQueue queReduct_;		//< 队列: 图像处理
 	FrameQueue queAstro_;		//< 队列: 天文定位
+	FrameQueue queMatch_;		//< 队列: 与星表匹配并重新建立定位关系
 	FrameQueue quePhoto_;		//< 队列: 测光
 	AstroDIPtr    reduct_;		//< 接口: 图像处理
 	AstroMetryPtr astro_;		//< 接口: 天文定位
+	MatchCatPtr   match_;		//< 接口: 匹配星表
 	PhotoMetryPtr photo_;		//< 接口: 测光
-	FindPVPtr finder_;			//< 接口: 运动目标关联
+	FindPVVec finder_;			//< 接口: 运动目标关联
 	threadptr thrd_reduct_;		//< 线程: 图像处理
 	threadptr thrd_astro_;		//< 线程: 天文定位
+	threadptr thrd_match_;		//< 线程: 匹配星表
 	threadptr thrd_photo_;		//< 线程: 测光
 	boost::condition_variable cv_reduct_;	//< 条件: 图像处理
 	boost::condition_variable cv_astro_;	//< 条件: 天文定位
+	boost::condition_variable cv_match_;	//< 条件: 匹配星表
 	boost::condition_variable cv_photo_;	//< 条件: 测光
 
 	/* 网络通信 */
@@ -113,6 +121,11 @@ public:
 	 */
 	void AstrometryResult(int rslt);
 	/*!
+	 * @brief 与星表的匹配结果
+	 * @param rslt 图像处理结果. true: 成功; false: 失败
+	 */
+	void MatchCatalogResult(bool rslt);
+	/*!
 	 * @brief 流量定标结果回调函数
 	 * @param rslt 流量定标结果. true: 成功; false: 失败
 	 */
@@ -129,6 +142,10 @@ protected:
 	 */
 	bool check_image(FramePtr frame);
 	/*!
+	 * @brief 查找合适的AFindPV对象
+	 */
+	FindPVPtr get_finder(FramePtr frame);
+	/*!
 	 * @brief 线程: 图像处理
 	 */
 	void thread_reduct();
@@ -136,6 +153,10 @@ protected:
 	 * @brief 线程: 天文定位
 	 */
 	void thread_astro();
+	/*!
+	 * @brief 线程: 匹配星表
+	 */
+	void thread_match();
 	/*!
 	 * @brief 线程: 测光
 	 */

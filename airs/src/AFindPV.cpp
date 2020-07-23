@@ -35,6 +35,16 @@ AFindPV::~AFindPV() {
 	thrd_newfrm_->join();
 }
 
+void AFindPV::SetIDs(const string& gid, const string& uid, const string& cid) {
+	gid_ = gid;
+	uid_ = uid;
+	cid_ = cid;
+}
+
+bool AFindPV::IsMatched(const string& gid, const string& uid, const string& cid) {
+	return (gid_ == gid && uid_ == uid && cid_ == cid);
+}
+
 void AFindPV::NewFrame(FramePtr frame) {
 	mutex_lock lck(mtx_frmque_);
 	frmque_.push_back(frame);

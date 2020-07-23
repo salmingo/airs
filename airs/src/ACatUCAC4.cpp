@@ -35,14 +35,13 @@ ACatUCAC4::~ACatUCAC4() {
 	if (m_asc)   delete []m_asc;
 }
 
-ucac4item_ptr ACatUCAC4::GetResult(int &n) {
-	n = m_nstars;
+ucac4item_ptr ACatUCAC4::GetResult(int* n) {
+	if (n) *n = m_nstars;
 	return m_stars;
 }
 
-bool ACatUCAC4::FindStar(double ra0, double dec0, double radius) {
-	if (!(ACatalog::FindStar(ra0, dec0, radius) && load_asc()))
-		return false;
+int ACatUCAC4::FindStar(double ra0, double dec0, double radius) {
+	if (!(ACatalog::FindStar(ra0, dec0, radius) && load_asc())) return 0;
 
 	vector<ucac4_item> vecrslt;	// 查找到条目的临时缓存区
 	int zr, zd;		// 赤经赤纬天区编号
@@ -100,7 +99,7 @@ bool ACatUCAC4::FindStar(double ra0, double dec0, double radius) {
 	if (alloc_buff(nelem = vecrslt.size()))
 		memcpy(m_stars, vecrslt.data(), sizeof(ucac4_item) * nelem);
 	vecrslt.clear();
-	return (m_nstars > 0);
+	return m_nstars;
 }
 
 bool ACatUCAC4::load_asc() {

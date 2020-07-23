@@ -83,9 +83,9 @@ public:
 	 * @param dec0    中心赤纬, 量纲: 角度
 	 * @param radius  搜索半径, 量纲: 角分. 若小于1角秒, 则采用1角秒作为阈值
 	 * @return
-	 * 若能够找到符合条件的恒星, 则返回true, 否则返回false
+	 * 符合条件的恒星的数量
 	 */
-	virtual bool FindStar(double ra0, double dec0, double radius);
+	virtual int FindStar(double ra0, double dec0, double radius);
 
 protected:
 	char m_pathCat[300];		//< 星表文件存储目录
