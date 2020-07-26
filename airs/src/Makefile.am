@@ -1,6 +1,6 @@
 bin_PROGRAMS=airs
-airs_SOURCES=daemon.cpp GLog.cpp AstroDIP.cpp AstroMetry.cpp PhotoMetry.cpp \
-             IOServiceKeep.cpp MessageQueue.cpp tcpasio.cpp DBCurl.cpp \
+airs_SOURCES=daemon.cpp GLog.cpp AstroDIP.cpp AstroMetry.cpp MatchCatalog.cpp PhotoMetry.cpp \
+             IOServiceKeep.cpp MessageQueue.cpp tcpasio.cpp DBCurl.cpp Parameter.h \
              AMath.cpp ATimeSpace.cpp ACatalog.cpp ACatUCAC4.cpp WCSTNX.cpp \
              AsciiProtocol.cpp LogCalibrated.cpp DoProcess.cpp AFindPV.cpp airs.cpp
 

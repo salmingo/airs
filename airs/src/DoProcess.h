@@ -132,6 +132,11 @@ public:
 	void PhotometryResult(bool rslt);
 
 protected:
+	/*!
+	 * @brief 将SEx的配置文件default.sex复制至目标目录
+	 * @param dstdir 目标目录名
+	 */
+	void copy_sexcfg(const string& dstdir);
 	/* 数据处理 */
 	/*!
 	 * @breif 创建AstroDIP/AstroMetry/PhotoMetry对象

@@ -63,7 +63,7 @@ struct ObjectInfo {
 	 * 3 : 前后关联匹配成功
 	 */
 	int matched;
-	double ra_cat;	//< 星表坐标+自行改正, J2000, 量纲: 角度
+	double ra_cat;	//< 星表坐标, J2000, 量纲: 角度
 	double dec_cat;
 	double mag_cat;	//< V星等: 星表. 无效值: 20
 	double mag_fit;	//< V星等: 拟合
@@ -71,8 +71,8 @@ struct ObjectInfo {
 public:
 	ObjectInfo() {
 		memset(this, 0, sizeof(ObjectInfo));
-		mag_cat = 20;
-		mag_cat = 20;
+		mag_cat = 20.;
+		mag_fit = 20.;
 	}
 };
 typedef boost::shared_ptr<ObjectInfo> NFObjPtr;
@@ -82,7 +82,6 @@ typedef std::vector<NFObjPtr> NFObjVec;
  * @struct OneFrame 单帧图像的特征信息
  */
 struct OneFrame {
-//	int result;			//< 处理结果标志字
 	/* FITS文件 */
 	string filepath;	//< 文件路径
 	string filename;	//< 文件名
@@ -104,6 +103,8 @@ struct OneFrame {
 	double rac, decc;	//< 中心视场指向, 量纲: 角度
 	double azic, altc;	//< 中心视场指向, 量纲: 角度
 	double airmass;		//< 大气质量: 中心指向
+	double scale;		//< 像元比例尺, 量纲: 角秒/像素
+	double errastro;	//< 天文定位拟合残差, 量纲: 角秒
 	int lastid;			//< 感兴趣目标的最后一个编号
 	NFObjVec nfobjs;	//< 集合: 目标特征
 	/*
@@ -115,7 +116,6 @@ struct OneFrame {
 
 public:
 	OneFrame() {
-//		result = SUCCESS_INIT;
 		wimg = himg = 0;
 		fno  = 0;
 		secofday = 0;
@@ -125,6 +125,8 @@ public:
 		rac  = decc = 0.0;
 		azic = altc = 0.0;
 		airmass  = 0.0;
+		scale    = 0.0;
+		errastro = 0.;
 		lastid   = 0;
 		mag0     = 0.0;
 		magk     = 0.0;

@@ -48,7 +48,7 @@ bool PhotoMetry::DoIt(FramePtr frame) {
 	frame_         = frame;
 	fullframe_     = true;
 	working_       = true;
-	frame_->result = PROCESS_PHOTOMETRY;
+//	frame_->result = PROCESS_PHOTOMETRY;
 
 	// 区域选择: 用于评估中心视场消光, 图像质量
 	int size = param_->sizeNear;

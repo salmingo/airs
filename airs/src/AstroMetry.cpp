@@ -31,7 +31,6 @@ AstroMetry::AstroMetry(Parameter *param) {
 	param_     = param;
 	working_   = false;
 	pid_       = 0;
-	ats_.SetSite(param_->lon, param_->lat, param_->alt, param_->timezone);
 }
 
 AstroMetry::~AstroMetry() {
@@ -62,7 +61,6 @@ bool AstroMetry::start_process() {
 	/* 以多进程模式启动天文定位 */
 	if ((pid_ = fork()) > 0) {// 主进程, 启动监测线程
 		working_ = true;
-		frame_->result = PROCESS_ASTROMETRY;
 		thrd_mntr_.reset(new boost::thread(boost::bind(&AstroMetry::thread_monitor, this)));
 		return true;
 	}
@@ -71,7 +69,7 @@ bool AstroMetry::start_process() {
 		return false;
 	}
 	boost::format fmt1("%d"), fmt2("%.1f");
-	chdir("/usr/local/etc/sex-param");
+//	chdir("/usr/local/etc/sex-param");
 	execl(param_->pathAstrometry.c_str(), "solve-field", "--use-sextractor",
 		"-p", "-K", "-J",
 		"-L", (fmt2 % param_->scale_low).str().c_str(), "-H", (fmt2 % param_->scale_high).str().c_str(),
@@ -110,36 +108,19 @@ void AstroMetry::thread_monitor() {
 	while (pid_ != (pid = waitpid(pid_, &status, WNOHANG | WUNTRACED)) && pid != -1);
 	if (pid_ == pid) success = wcs.load_wcs(ptMntr_[PTMNTR_WCS]);
 	if (success) {
+		/* 计算像元比例尺 */
+		double *cd = &wcs.cd[0][0];
+		double k = cd[2] / cd[0];
+		frame_->scale = 3600. * sqrt(cd[0] * (cd[3] - k * cd[1]));
 		/* 计算星象位置 */
 		NFObjVec &objs = frame_->nfobjs;
 		for (NFObjVec::iterator it = objs.begin(); it != objs.end(); ++it) {
 			wcs.image_to_wcs((*it)->features[NDX_X], (*it)->features[NDX_Y], (*it)->ra_fit, (*it)->dec_fit);
 		}
-
-		/* 计算视场中心指向 */
-		double ra, dec, azi, alt;
-		ptime tmmid = from_iso_extended_string(frame_->tmmid);
-		ptime::date_type date = tmmid.date();
-		double fd = tmmid.time_of_day().total_seconds() / 86400.0;
-		double lmst;	// 本地平恒星时
-		double reair;	// 大气折射
-		double airp(1010), temp(20); // 环境取: 大气压1010百帕, 温度20摄氏度
-
-		ats_.SetUTC(date.year(), date.month(), date.day(), fd);
-		lmst = ats_.LocalMeanSiderealTime();
-		wcs.image_to_wcs(frame_->wimg * 0.5 - 0.5, frame_->himg * 0.5 - 0.5, ra, dec);
-		ats_.Eq2Horizon(lmst - ra * D2R, dec * D2R, azi, alt);
-		reair = ats_.TrueRefract(alt, airp, temp) / 60.0; // ==> 角度
-		frame_->rac = ra, frame_->decc = dec;
-		frame_->azic = azi * R2D, frame_->altc = alt * R2D;
-		frame_->airmass = ats_.AirMass(alt * R2D + reair);
-		_gLog->Write("%s. Center: [%8.4f, %8.4f], airmass=%6.3f", frame_->filename.c_str(),
-				ra, dec, frame_->airmass);
 	}
 #ifndef NDEBUG
 	for (int i = 0; i < PTMNTR_MAX; ++i) remove(ptMntr_[i]);
 #endif
 	working_ = false;
-	frame_->result = success ? SUCCESS_ASTROMETRY : FAIL_ASTROMETRY;
 	rsltAstrometry_(success);
 }

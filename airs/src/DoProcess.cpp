@@ -122,6 +122,13 @@ void DoProcess::PhotometryResult(bool rslt) {
 }
 
 //////////////////////////////////////////////////////////////////////////////
+void DoProcess::copy_sexcfg(const string& dstdir) {
+	path srcpath(param_.pathCfgSex);
+	path dstpath(dstdir);
+	dstpath /= "default.sex";
+	if (!exists(dstpath)) copy_file(srcpath, dstpath);
+}
+
 /* 数据处理 */
 void DoProcess::create_objects() {
 	reduct_  = boost::make_shared<AstroDIP>(&param_);
@@ -147,6 +154,11 @@ void DoProcess::create_objects() {
 }
 
 bool DoProcess::check_image(FramePtr frame) {
+	// 检查并准备环境
+	path filepath(frame->filepath);
+	copy_sexcfg(filepath.parent_path().string());
+
+	// 读取文件头信息
 	fitsfile *fitsptr;	//< 基于cfitsio接口的文件操作接口
 	int status(0);
 	char dateobs[30], timeobs[30], temp[30];
@@ -217,7 +229,7 @@ DoProcess::FindPVPtr DoProcess::get_finder(FramePtr frame) {
 		}
 	}
 	if (!finder.use_count()) {
-		finder = boost::make_shared<AFindPV>();
+		finder = boost::make_shared<AFindPV>(&param_);
 		finder->SetIDs(gid, uid, cid);
 		finder_.push_back(finder);
 	}

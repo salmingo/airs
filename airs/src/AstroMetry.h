@@ -12,7 +12,6 @@
 #include <unistd.h>
 #include "airsdata.h"
 #include "Parameter.h"
-#include "ATimeSpace.h"
 
 struct wcsinfo {
 	double x0, y0;	//< XY参考点
@@ -248,7 +247,6 @@ protected:
 	threadptr thrd_mntr_;	//< 线程: 监测处理结果
 	pid_t pid_;				//< 进程ID
 	AstrometryResult rsltAstrometry_;	//< 天文定位结果回调函数
-	AstroUtil::ATimeSpace ats_;	//< 时空转换接口
 
 public:
 	/*!

@@ -104,11 +104,11 @@ CONFIG_CLEAN_VPATH_FILES =
 am__installdirs = "$(DESTDIR)$(bindir)"
 PROGRAMS = $(bin_PROGRAMS)
 am_airs_OBJECTS = daemon.$(OBJEXT) GLog.$(OBJEXT) AstroDIP.$(OBJEXT) \
-	AstroMetry.$(OBJEXT) PhotoMetry.$(OBJEXT) \
-	IOServiceKeep.$(OBJEXT) MessageQueue.$(OBJEXT) \
-	tcpasio.$(OBJEXT) DBCurl.$(OBJEXT) AMath.$(OBJEXT) \
-	ATimeSpace.$(OBJEXT) ACatalog.$(OBJEXT) ACatUCAC4.$(OBJEXT) \
-	WCSTNX.$(OBJEXT) AsciiProtocol.$(OBJEXT) \
+	AstroMetry.$(OBJEXT) MatchCatalog.$(OBJEXT) \
+	PhotoMetry.$(OBJEXT) IOServiceKeep.$(OBJEXT) \
+	MessageQueue.$(OBJEXT) tcpasio.$(OBJEXT) DBCurl.$(OBJEXT) \
+	AMath.$(OBJEXT) ATimeSpace.$(OBJEXT) ACatalog.$(OBJEXT) \
+	ACatUCAC4.$(OBJEXT) WCSTNX.$(OBJEXT) AsciiProtocol.$(OBJEXT) \
 	LogCalibrated.$(OBJEXT) DoProcess.$(OBJEXT) AFindPV.$(OBJEXT) \
 	airs.$(OBJEXT)
 airs_OBJECTS = $(am_airs_OBJECTS)
@@ -138,10 +138,10 @@ am__depfiles_remade = ./$(DEPDIR)/ACatUCAC4.Po ./$(DEPDIR)/ACatalog.Po \
 	./$(DEPDIR)/AstroDIP.Po ./$(DEPDIR)/AstroMetry.Po \
 	./$(DEPDIR)/DBCurl.Po ./$(DEPDIR)/DoProcess.Po \
 	./$(DEPDIR)/GLog.Po ./$(DEPDIR)/IOServiceKeep.Po \
-	./$(DEPDIR)/LogCalibrated.Po ./$(DEPDIR)/MessageQueue.Po \
-	./$(DEPDIR)/PhotoMetry.Po ./$(DEPDIR)/WCSTNX.Po \
-	./$(DEPDIR)/airs.Po ./$(DEPDIR)/daemon.Po \
-	./$(DEPDIR)/tcpasio.Po
+	./$(DEPDIR)/LogCalibrated.Po ./$(DEPDIR)/MatchCatalog.Po \
+	./$(DEPDIR)/MessageQueue.Po ./$(DEPDIR)/PhotoMetry.Po \
+	./$(DEPDIR)/WCSTNX.Po ./$(DEPDIR)/airs.Po \
+	./$(DEPDIR)/daemon.Po ./$(DEPDIR)/tcpasio.Po
 am__mv = mv -f
 CXXCOMPILE = $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) \
 	$(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS)
@@ -156,6 +156,18 @@ AM_V_CXXLD = $(am__v_CXXLD_@AM_V@)
 am__v_CXXLD_ = $(am__v_CXXLD_@AM_DEFAULT_V@)
 am__v_CXXLD_0 = @echo "  CXXLD   " $@;
 am__v_CXXLD_1 = 
+COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
+	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
+AM_V_CC = $(am__v_CC_@AM_V@)
+am__v_CC_ = $(am__v_CC_@AM_DEFAULT_V@)
+am__v_CC_0 = @echo "  CC      " $@;
+am__v_CC_1 = 
+CCLD = $(CC)
+LINK = $(CCLD) $(AM_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
+AM_V_CCLD = $(am__v_CCLD_@AM_V@)
+am__v_CCLD_ = $(am__v_CCLD_@AM_DEFAULT_V@)
+am__v_CCLD_0 = @echo "  CCLD    " $@;
+am__v_CCLD_1 = 
 SOURCES = $(airs_SOURCES)
 DIST_SOURCES = $(airs_SOURCES)
 am__can_run_installinfo = \
@@ -287,8 +299,8 @@ target_vendor = @target_vendor@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-airs_SOURCES = daemon.cpp GLog.cpp AstroDIP.cpp AstroMetry.cpp PhotoMetry.cpp \
-             IOServiceKeep.cpp MessageQueue.cpp tcpasio.cpp DBCurl.cpp \
+airs_SOURCES = daemon.cpp GLog.cpp AstroDIP.cpp AstroMetry.cpp MatchCatalog.cpp PhotoMetry.cpp \
+             IOServiceKeep.cpp MessageQueue.cpp tcpasio.cpp DBCurl.cpp Parameter.h \
              AMath.cpp ATimeSpace.cpp ACatalog.cpp ACatUCAC4.cpp WCSTNX.cpp \
              AsciiProtocol.cpp LogCalibrated.cpp DoProcess.cpp AFindPV.cpp airs.cpp
 
@@ -399,6 +411,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/GLog.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/IOServiceKeep.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/LogCalibrated.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/MatchCatalog.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/MessageQueue.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/PhotoMetry.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/WCSTNX.Po@am__quote@ # am--include-marker
@@ -566,6 +579,7 @@ distclean: distclean-am
 	-rm -f ./$(DEPDIR)/GLog.Po
 	-rm -f ./$(DEPDIR)/IOServiceKeep.Po
 	-rm -f ./$(DEPDIR)/LogCalibrated.Po
+	-rm -f ./$(DEPDIR)/MatchCatalog.Po
 	-rm -f ./$(DEPDIR)/MessageQueue.Po
 	-rm -f ./$(DEPDIR)/PhotoMetry.Po
 	-rm -f ./$(DEPDIR)/WCSTNX.Po
@@ -630,6 +644,7 @@ maintainer-clean: maintainer-clean-am
 	-rm -f ./$(DEPDIR)/GLog.Po
 	-rm -f ./$(DEPDIR)/IOServiceKeep.Po
 	-rm -f ./$(DEPDIR)/LogCalibrated.Po
+	-rm -f ./$(DEPDIR)/MatchCatalog.Po
 	-rm -f ./$(DEPDIR)/MessageQueue.Po
 	-rm -f ./$(DEPDIR)/PhotoMetry.Po
 	-rm -f ./$(DEPDIR)/WCSTNX.Po

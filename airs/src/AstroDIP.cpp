@@ -21,34 +21,34 @@ using namespace boost::posix_time;
 
 //////////////////////////////////////////////////////////////////////////////
 /* 临时以固定数组管理坏像素 */
-int bad_col[] = {
-	1380
-};
-
-int bad_pixel[][2] = {
-	{4090,   79},
-	{ 943,  179},
-	{3568, 1069},
-	{ 840, 1201},
-	{3976, 1210},
-	{2989, 1236},
-	{3063, 1677},
-	{2404, 2307},
-	{2458, 2336},
-	{1867, 2340},
-	{2816, 2579},
-	{3226, 2894},
-	{3227, 2894},
-	{3276, 2908},
-	{3277, 2908},
-	{3319, 2942},
-	{3232, 3375},
-	{3794, 3408},
-	{4051, 3458},
-	{4041, 3473},
-	{3733, 3800},
-	{1509, 3953}
-};
+//int bad_col[] = {
+//	1380
+//};
+//
+//int bad_pixel[][2] = {
+//	{4090,   79},
+//	{ 943,  179},
+//	{3568, 1069},
+//	{ 840, 1201},
+//	{3976, 1210},
+//	{2989, 1236},
+//	{3063, 1677},
+//	{2404, 2307},
+//	{2458, 2336},
+//	{1867, 2340},
+//	{2816, 2579},
+//	{3226, 2894},
+//	{3227, 2894},
+//	{3276, 2908},
+//	{3277, 2908},
+//	{3319, 2942},
+//	{3232, 3375},
+//	{3794, 3408},
+//	{4051, 3458},
+//	{4041, 3473},
+//	{3733, 3800},
+//	{1509, 3953}
+//};
 
 /*!
  * @brief 检查是否坏像素
@@ -56,28 +56,28 @@ int bad_pixel[][2] = {
  * bad_pixel[][]先按[][1]排序, 若[1]相同, 则按[0]排序
  */
 bool is_badpixel(double x, double y) {
-	int x0 = int(x + 0.5);
-	int y0 = int(y + 0.5);
-	int n = sizeof(bad_col) / sizeof(int);
-	int low, high, now;
-	for (now = 0; now < n; ++now) {
-		if (abs(bad_col[now] - x0) < 2) return true;
-	}
-
-	n = sizeof(bad_pixel) / sizeof(int) / 2;
-	low = 0;
-	high = n - 1;
-	if (y0 < bad_pixel[low][1] || y0 > bad_pixel[high][1]) return false;
-	while (low < n && bad_pixel[low][1] < y0) ++low;
-	high = low;
-	while (high < n && bad_pixel[high][1] == y0) ++high;
-	if (low < high) {
-		for (now = low; now < high; ++now) {
-			if (x0 == bad_pixel[now][0]) return true;
-		}
-	}
-	else if (low < n)
-		return (bad_pixel[low][1] == y0 && bad_pixel[low][0] == x0);
+//	int x0 = int(x + 0.5);
+//	int y0 = int(y + 0.5);
+//	int n = sizeof(bad_col) / sizeof(int);
+//	int low, high, now;
+//	for (now = 0; now < n; ++now) {
+//		if (abs(bad_col[now] - x0) < 2) return true;
+//	}
+//
+//	n = sizeof(bad_pixel) / sizeof(int) / 2;
+//	low = 0;
+//	high = n - 1;
+//	if (y0 < bad_pixel[low][1] || y0 > bad_pixel[high][1]) return false;
+//	while (low < n && bad_pixel[low][1] < y0) ++low;
+//	high = low;
+//	while (high < n && bad_pixel[high][1] == y0) ++high;
+//	if (low < high) {
+//		for (now = low; now < high; ++now) {
+//			if (x0 == bad_pixel[now][0]) return true;
+//		}
+//	}
+//	else if (low < n)
+//		return (bad_pixel[low][1] == y0 && bad_pixel[low][0] == x0);
 	return false;
 }
 
@@ -110,7 +110,6 @@ bool AstroDIP::DoIt(FramePtr frame) {
 	/* 以多进程模式启动图像处理 */
 	if ((pid_ = fork()) > 0) {// 主进程, 启动监测线程
 		working_ = true;
-		frame->result = PROCESS_IMGREDUCT;
 		thrd_mntr_.reset(new boost::thread(boost::bind(&AstroDIP::thread_monitor, this)));
 		return true;
 	}
@@ -174,7 +173,7 @@ void AstroDIP::load_catalog() {
 			}
 			features = body->features;
 			if (pos == NDX_MAX
-					&& !is_badpixel(features[NDX_X], features[NDX_Y])
+//					&& !is_badpixel(features[NDX_X], features[NDX_Y])
 					&& features[NDX_FLUX] > 1.0
 					&& features[NDX_FWHM] > 0.5
 					&& features[NDX_BACK] < 50000.0) {
@@ -222,6 +221,6 @@ void AstroDIP::thread_monitor() {
 	 * 判定: 有效目标数量不得少于100
 	 */
 	success = frame_->nfobjs.size() > 100;
-	frame_->result = success ? SUCCESS_IMGREDUCT : FAIL_IMGREDUCT;
+//	frame_->result = success ? SUCCESS_IMGREDUCT : FAIL_IMGREDUCT;
 	rsltReduct_(success);
 }
