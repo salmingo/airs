@@ -9,6 +9,7 @@
 
 #include <boost/smart_ptr.hpp>
 #include <boost/thread.hpp>
+#include <string.h>
 #include <vector>
 #include <string>
 #include <cmath>
@@ -19,6 +20,39 @@
 
 namespace AstroUtil {
 //////////////////////////////////////////////////////////////////////////////
+/*!
+ * @struct param_pvfind
+ */
+typedef struct param_pvfind {
+	int track_mode;	// 0: 静止; 1: 恒星跟踪; 2: 快速运动
+	double changed_point;	//< 阈值: 指向变更, 量纲: 弧度. 取最大边长视场的0.2x
+	double nodata_delay;	//< 阈值: 无后续数据时延, 量纲: 秒. 取帧间隔的5x. 用于终结候选体
+
+public:
+	param_pvfind() {
+		memset(this, 0, sizeof(struct param_pvfind));
+	}
+
+	void reset() {
+		memset(this, 0, sizeof(struct param_pvfind));
+	}
+
+	/*!
+	 * @brief 由赤经轴速度计算跟踪模式
+	 * @param rate_ra  赤经轴速度, 量纲: 角秒/秒
+	 * @param rate_dec 赤纬轴速度, 量纲: 角秒/秒
+	 */
+	void set_track_rate(double rate_ra, double rate_dec) {
+		if (fabs(rate_ra - 15.) < 2. && fabs(rate_dec) < 2.) track_mode = 0;
+		else if (fabs(rate_ra) < 2. && fabs(rate_dec) < 2.)  track_mode = 1;
+		else track_mode = 2;
+	}
+
+	void set_frame_delay(double delay) {
+		nodata_delay = delay * 5.;
+	}
+} PrmPVFind;
+
 typedef struct pv_point {// 单数据点
 	// 图像帧
 	string filename;	//< 文件名

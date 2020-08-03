@@ -48,7 +48,6 @@ bool PhotoMetry::DoIt(FramePtr frame) {
 	frame_         = frame;
 	fullframe_     = true;
 	working_       = true;
-//	frame_->result = PROCESS_PHOTOMETRY;
 
 	// 区域选择: 用于评估中心视场消光, 图像质量
 	int size = param_->sizeNear;
@@ -67,7 +66,6 @@ bool PhotoMetry::DoIt(FramePtr frame, double x0, double y0) {
 	frame_         = frame;
 	fullframe_     = false;
 	working_       = true;
-//	frame_->result = PROCESS_PHOTOMETRY;
 
 	int size = param_->sizeNear;
 	if (!(size & 1)) ++size;
@@ -96,75 +94,26 @@ FramePtr PhotoMetry::GetFrame() {
 bool PhotoMetry::do_match() {
 	NFObjVec &objs = frame_->nfobjs;
 	NFObjPtr obj;
-	ptime mid = from_iso_extended_string(frame_->tmmid);
-	int n0(objs.size()), n1, n2, n, i, j;
-	ucac4item_ptr stars, star, ptr;
-	double ra0, dec0;	//< wcs计算坐标
-	double ra1, dec1;	//< 星表坐标
+	int n0(objs.size()), i;
 	MagVec mags;
-	double t;
 	double x, y;
 
-	t = (mid.date().modjulian_day() + mid.time_of_day().total_seconds() / 86400.0 - 51544.5) / 365.25;
-	t = t * 1E-4;	// 0.1毫角秒转换为角秒
-
-	for (i = n1 = n2 = 0; i < n0; ++i) {
+	for (i = 0; i < n0; ++i) {
 		obj = objs[i];
+		if (obj->matched != 1) continue;
 		x   = obj->features[NDX_X];
 		y   = obj->features[NDX_Y];
 		if (!fullframe_ && (x < x1_ || x >= x2_ || y < y1_ || y >= y2_)) continue;
-
-		ra0 = obj->ra_fit;
-		dec0= obj->dec_fit;
-		if (ucac4_->FindStar(ra0, dec0, 0.5)) {// 搜索半径: 30角秒
-			stars = ucac4_->GetResult(&n);
-			if (n == 1) {
-				++n1;
-				star  = stars;
-			}
-			else {
-				++n2;
-				double dx, dy, dxy2, dxy2min(1E30);
-				for (j = 0, ptr = stars; j < n; ++j, ++ptr) {
-					dec1 = (double) ptr->spd / MILLIAS - 90.0;
-					ra1 = (double) ptr->ra / MILLIAS + ptr->pmrac * t * AS2D / cos(dec1 * D2R);
-					dec1 += (ptr->pmdc * t * AS2D);
-
-					dx = ra0 - ra1;
-					dy = dec0 - dec1;
-					if (dx < -180.0) dx += 360.0;
-					else if (dx > 180.0) dx -= 360.0;
-					dx *= cos(dec1 * D2R);
-					dxy2 = dx * dx + dy * dy;
-					if (dxy2 < dxy2min) {
-						dxy2min = dxy2;
-						star = ptr;
-					}
-				}
-			}
-			dec1  = (double) star->spd / MILLIAS - 90.0;
-			ra1   = (double) star->ra / MILLIAS + star->pmrac * t / cos(dec1 * D2R);
-			dec1 += star->pmdc * t;
-
-			obj->matched = 1;
-			obj->ra_cat  = ra1;
-			obj->dec_cat = dec1;
-			obj->mag_cat = star->apasm[3] * 0.001;
-			if (star->apasm[3] != 20000 && x >= x1_ && x < x2_ && y >= y1_ && y < y2_) {
-				Magnitude mag;
-				mag.img = obj->features[NDX_MAG];
-				mag.cat = obj->mag_cat;
-				mag.err = 0;
-				mags.push_back(mag);
-			}
+		if (obj->mag_cat < 19.999) {
+			Magnitude mag;
+			mag.img = obj->features[NDX_MAG];
+			mag.cat = obj->mag_cat;
+			mag.err = 0;
+			mags.push_back(mag);
 		}
 	}
-	if (mags.size() > 10) do_fit(mags);
-	/**
-	 * @note 2019-11-23
-	 * 与星表匹配后, 未匹配项数量不得超过总数量的40%
-	 */
-	return ((n0 - n1 - n2) < int(0.4 * n0));
+	if (mags.size() >= 10) do_fit(mags);
+	return (mags.size() >= 10);
 }
 
 /*
@@ -277,6 +226,5 @@ void PhotoMetry::thread_match() {
 	}
 
 	working_ = false;
-//	frame_->result = rslt ? SUCCESS_PHOTOMETRY : FAIL_PHOTOMETRY;
 	rsltPhotometry_(rslt);
 }
