@@ -61,6 +61,7 @@ void AFindPV::end_sequence() {
 		frmprev_.reset();
 		frmnow_.reset();
 		cans_.clear();
+		prmFind_.reset();
 	}
 }
 
@@ -68,10 +69,28 @@ void AFindPV::add_point(PvPtPtr pt) {
 	frmnow_->pts.push_back(pt);
 }
 
-void AFindPV::new_frame(int fno) {
-	last_fno_ = fno;
+void AFindPV::new_frame(FramePtr frame) {
+	last_fno_ = frame->fno;
 	frmprev_  = frmnow_;
+
 	frmnow_   = boost::make_shared<PvFrame>();
+	frmnow_->secofday = frame->secofday;
+	frmnow_->rac      = frame->rac;
+	frmnow_->decc     = frame->decc;
+
+	if (!frmprev_.unique()) {// prev指向空, 即仅now有效, 此时计算视场
+
+	}
+	else if (prmFind_.nodata_delay < 1E-6) {
+		double delay = frmnow_->secofday - frmprev_->secofday;
+		double dra = frmnow_->rac - frmprev_->rac;
+		double ddc = frmnow_->decc - frmprev_->decc;
+		if (delay < 0.) delay += 86400.;
+		dra = dra * 3600. / delay;
+		ddc = ddc * 3600. / delay;
+		prmFind_.set_frame_delay(delay);
+		prmFind_.set_track_rate(dra, ddc);
+	}
 }
 
 void AFindPV::end_frame() {
@@ -79,6 +98,40 @@ void AFindPV::end_frame() {
 	if (frmnow_.unique() && frmnow_->pts.size()) {
 		append_candidates(); 	// 尝试将该帧数据加入候选体
 		create_candidates();	// 为未关联数据建立新的候选体
+	}
+}
+
+void AFindPV::correct_annual_aberration(FramePtr frame) {
+	AnnualAberration abb;
+	double mjd = frame->mjd;
+	double ra, dec, d_ra, d_dec;
+	NFObjVec &objs = frame->nfobjs;
+	int n = objs.size();
+	for (int i = 0; i < n; ++i) {
+		if (!objs[i]->matched) {
+			/* 改正: 周年光行差 */
+			ra = objs[i]->ra_fit * D2R;
+			dec = objs[i]->dec_fit * D2R;
+			abb.GetAnnualAberration(mjd, ra, dec, d_ra, d_dec);
+			ra  = cyclemod(ra + d_ra, A2PI) * R2D;
+			dec = (dec + d_dec) * R2D;
+			if (dec > 90.0) {
+				dec = 180.0 - dec;
+				ra  = cyclemod(ra + 180.0, 360.0);
+			}
+			else if (dec < -90) {
+				dec = -180 - dec;
+				ra  = cyclemod(ra + 180.0, 360.0);
+			}
+			objs[i]->ra_fit = ra;
+			objs[i]->dec_fit = dec;
+
+			PvPtPtr pt = boost::make_shared<PvPt>();
+			*pt = *frame;
+			*pt = *(objs[i]);
+			pt->id = objs[i]->id;
+			add_point(pt);
+		}
 	}
 }
 
@@ -471,7 +524,7 @@ void AFindPV::save_gtw_orbit(PvObjPtr obj) {
 void AFindPV::thread_newframe() {
 	boost::mutex mtx;
 	mutex_lock lck(mtx);
-	boost::chrono::seconds period(30);
+	boost::chrono::minutes period(5);
 
 	while (1) {
 		if (frmque_.empty()) // 当无待处理图像时, 延时等待
@@ -496,39 +549,8 @@ void AFindPV::thread_newframe() {
 			}
 			create_dir(frame);
 			upload_ot(frame);
-			new_frame(frame->fno);
-
-			AnnualAberration abb;
-			double mjd = frame->mjd;
-			double ra, dec, d_ra, d_dec;
-			NFObjVec &objs = frame->nfobjs;
-			int n = objs.size();
-			for (int i = 0; i < n; ++i) {
-				if (!objs[i]->matched) {
-					/* 改正: 周年光行差 */
-					ra = objs[i]->ra_fit * D2R;
-					dec = objs[i]->dec_fit * D2R;
-					abb.GetAnnualAberration(mjd, ra, dec, d_ra, d_dec);
-					ra  = cyclemod(ra + d_ra, A2PI) * R2D;
-					dec = (dec + d_dec) * R2D;
-					if (dec > 90.0) {
-						dec = 180.0 - dec;
-						ra  = cyclemod(ra + 180.0, 360.0);
-					}
-					else if (dec < -90) {
-						dec = -180 - dec;
-						ra  = cyclemod(ra + 180.0, 360.0);
-					}
-					objs[i]->ra_fit = ra;
-					objs[i]->dec_fit = dec;
-
-					PvPtPtr pt = boost::make_shared<PvPt>();
-					*pt = *frame;
-					*pt = *(objs[i]);
-					pt->id = objs[i]->id;
-					add_point(pt);
-				}
-			}
+			new_frame(frame);
+			correct_annual_aberration(frame);
 			end_frame();
 		}
 	}

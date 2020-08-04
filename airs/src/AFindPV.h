@@ -104,6 +104,8 @@ typedef boost::shared_ptr<PvPt> PvPtPtr;
 typedef std::vector<PvPtPtr> PvPtVec;
 
 typedef struct pv_frame {// 单帧数据共性属性及数据点集合
+	double secofday;	//< 曝光中间时刻对应的当日秒数
+	double rac, decc;	//< 视场中心指向, 量纲: 角度
 	PvPtVec pts;	//< 数据点集合
 
 public:
@@ -267,6 +269,7 @@ public:
 	virtual ~AFindPV();
 
 protected:
+	PrmPVFind prmFind_;	//< 关联参数
 	/* 成员变量 */
 	Parameter *param_;	//< 配置参数
 	string gid_;		//< 组标志
@@ -303,11 +306,15 @@ protected:
 	/*!
 	 * @brief 开始处理新的一帧数据
 	 */
-	void new_frame(int fno);
+	void new_frame(FramePtr frame);
 	/*!
 	 * @brief 完成一帧数据处理
 	 */
 	void end_frame();
+	/*!
+	 * @brief 修正周年光行差
+	 */
+	void correct_annual_aberration(FramePtr frame);
 	/*!
 	 * @brief 添加一个候选体
 	 */
