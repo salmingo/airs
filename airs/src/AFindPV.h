@@ -31,15 +31,18 @@ typedef std::vector<BadPix> BadPixVec;	//< 坏像素列表
 
 typedef struct refstar {
 	double ra, dec;	//< 赤道坐标, 量纲: 角度
+	int idxr, idxd;	//< 坐标对应的索引
 
 public:
 	refstar() {
 		ra = dec = 0.;
+		idxr = idxd = 0;
 	}
 
 	refstar(double _ra, double _dec) {
 		ra  = _ra;
 		dec = _dec;
+		idxr = idxd = 0;
 	}
 } RefStar;
 typedef std::vector<RefStar> RefStarVec;	//< 参考星列表
@@ -66,9 +69,11 @@ protected:
 	threadptr thrd_newfrm_;		//< 线程: 循环处理图像队列
 	FrameQue frmque_;	//< 队列: 待处理图像
 	FramePtr frmprev_;	//< 图像帧: 上一帧, 用作模板
-	int last_fno_;		//< 最后一个帧编号
+	int last_fno_;	//< 最后一个帧编号
 	/* 控制变量 */
 	int mjday_;		//< 日期, 修正儒略日的整数部分
+	double wratio_;	//< 采用窗口的倒数, 量纲: 角度^-1
+
 	/* 输出处理结果 */
 	int idpv_;			//< 目标序号
 	int idgtw_;			//< 顺序编号, 范围: 1-999
@@ -112,7 +117,7 @@ protected:
 	/*!
 	 * @brief 启动新的批处理流程
 	 */
-	void new_sequence();
+	void new_sequence(FramePtr frame);
 	/*!
 	 * @brief 完成批处理流程
 	 */
@@ -124,6 +129,12 @@ protected:
 	void cross_ot(FramePtr frame);
 	void cross_with_module(FramePtr frame);
 	void cross_with_prev(FramePtr frame);
+	/*!
+	 * @brief 计算恒星的索引
+	 * @note
+	 * 由坐标计算索引
+	 */
+	void index_star(RefStar& star);
 
 protected:
 	/* 功能: 数据输出 */

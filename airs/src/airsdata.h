@@ -20,18 +20,6 @@
 using std::string;
 using namespace AstroUtil;
 
-//#define FAIL_IMGREDUCT		-1		//< 图像处理失败
-//#define FAIL_ASTROMETRY		-2		//< 天文定位失败
-//#define FAIL_PHOTOMETRY		-3		//< 流量定标失败
-//#define SUCCESS_INIT		0x00	//< 初始化
-//#define SUCCESS_COMPLETE	0x01	//< 完成处理流程
-//#define SUCCESS_IMGREDUCT	0x02	//< 完成图像处理
-//#define SUCCESS_ASTROMETRY	0x04	//< 完成天文定位
-//#define SUCCESS_PHOTOMETRY	0x08	//< 完成流量定标
-//#define PROCESS_IMGREDUCT	0x11	//< 执行图像处理
-//#define PROCESS_ASTROMETRY	0x12	//< 执行天文定位
-//#define PROCESS_PHOTOMETRY	0x13	//< 执行流量定标
-
 enum {
 	NDX_X,
 	NDX_Y,
@@ -107,6 +95,7 @@ struct OneFrame {
 	double errastro;	//< 天文定位拟合残差, 量纲: 角秒
 	int lastid;			//< 感兴趣目标的最后一个编号
 	NFObjVec nfobjs;	//< 集合: 目标特征
+	int notOt;			//< 非瞬变源的数量. 非瞬变源=恒星+坏点
 	/*
 	 * 仪器星等改正及大气消光
 	 * @ -mag0参与拟合消光系数, 每天依据大气质量分布范围判定是否输出晓光系数
@@ -128,6 +117,7 @@ public:
 		scale    = 0.0;
 		errastro = 0.;
 		lastid   = 0;
+		notOt    = 0;
 		mag0     = 0.0;
 		magk     = 0.0;
 	}

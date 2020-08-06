@@ -118,6 +118,7 @@ void MatchCatalog::match_ucac4(double r) {
 			++n;
 		}
 	}
+	frame_->notOt = n;
 }
 
 void MatchCatalog::refstar_from_frame() {

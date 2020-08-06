@@ -74,7 +74,7 @@ void AFindPV::thread_newframe() {
 		else {// 开始处理新的图像帧
 			if (frame->fno < last_fno_) {
 				end_sequence();
-				new_sequence();
+				new_sequence(frame);
 			}
 			create_dir(frame);
 			cross_ot(frame);
@@ -97,7 +97,9 @@ void AFindPV::end_frame(FramePtr frame) {
 	last_fno_ = frame->fno;
 }
 
-void AFindPV::new_sequence() {
+void AFindPV::new_sequence(FramePtr frame) {
+	// 采用窗口: 3x pixel=±1.5pixel
+	wratio_ = 3600. / 3. / frame->scale;
 }
 
 void AFindPV::end_sequence() {
@@ -123,6 +125,7 @@ void AFindPV::cross_ot(FramePtr frame) {
 		for (i = 0; i < npts; ++i) {
 			if (objs[i]->matched == 1) {
 				RefStar star(objs[i]->ra_cat, objs[i]->dec_cat);
+				index_star(star);
 				refstars_.push_back(star);
 			}
 		}
@@ -130,11 +133,37 @@ void AFindPV::cross_ot(FramePtr frame) {
 }
 
 void AFindPV::cross_with_module(FramePtr frame) {
+	NFObjVec &objs = frame->nfobjs;
+	int npts = objs.size(), i;
+	int& notOt = frame->notOt;
 
+	for (i = 0; notOt < npts && i < npts; ++i) {
+		if (objs[i]->matched) continue;
+	}
 }
 
 void AFindPV::cross_with_prev(FramePtr frame) {
+	NFObjVec &objs = frame->nfobjs;
+	int npts = objs.size(), i;
+	int& notOt = frame->notOt;
+	if (!frmprev_.unique()) return;
 
+	for (i = 0; notOt < npts && i < npts; ++i) {
+		if (objs[i]->matched) continue;
+	}
+}
+
+void AFindPV::index_star(RefStar& star) {
+	int& idxr = star.idxr;
+	int& idxd = star.idxd;
+
+	/*
+	 * wsample_:
+	 */
+	if (idxr == 0 && idxd == 0) {
+		idxr = int(star.ra * cos(star.dec * D2R) * wratio_ + 0.5);
+		idxd = int(star.dec * wratio_ + 0.5);
+	}
 }
 
 void AFindPV::create_dir(FramePtr frame) {
