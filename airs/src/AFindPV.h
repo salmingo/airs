@@ -23,6 +23,8 @@ namespace AstroUtil {
 //////////////////////////////////////////////////////////////////////////////
 /*!
  * @struct bad_pixel 坏像素. 例如: 热点
+ * - 判定对象: 候选体
+ * - 判据:
  */
 typedef struct bad_pixel {
 	double x, y;
