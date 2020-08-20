@@ -15,6 +15,8 @@ using namespace boost;
 using namespace boost::filesystem;
 using namespace boost::posix_time;
 
+char DoProcess::msgid_ = 0;
+
 DoProcess::DoProcess() {
 	asdaemon_   = false;
 	ios_        = NULL;
@@ -37,6 +39,7 @@ bool DoProcess::StartService(bool asdaemon, boost::asio::io_service *ios) {
 		register_messages();
 		std::string name = "msgque_";
 		name += DAEMON_NAME;
+		name += ++msgid_;
 		if (!Start(name.c_str())) return false;
 		if (!connect_server_gc()) return false;
 		if (!connect_server_fileserver()) return false;
@@ -215,23 +218,19 @@ bool DoProcess::check_image(FramePtr frame) {
 }
 
 DoProcess::FindPVPtr DoProcess::get_finder(FramePtr frame) {
-	FindPVVec::iterator itend = finder_.end();
+	FindPVVec::iterator itend = finders_.end();
 	FindPVVec::iterator it;
 	string gid = frame->gid;
 	string uid = frame->uid;
 	string cid = frame->cid;
 	FindPVPtr finder;
 
-	for (it = finder_.begin(); it != itend; ++it) {
-		if ((*it)->IsMatched(gid, uid, cid)) {
-			finder = *it;
-			break;
-		}
-	}
-	if (!finder.use_count()) {
+	for (it = finders_.begin(); it != itend && (*it)->IsMatched(gid, uid, cid) == false; ++it);
+	if (it != itend) finder = *it;
+	else {
 		finder = boost::make_shared<AFindPV>(&param_);
 		finder->SetIDs(gid, uid, cid);
-		finder_.push_back(finder);
+		finders_.push_back(finder);
 	}
 
 	return finder;

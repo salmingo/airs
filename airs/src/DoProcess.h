@@ -56,6 +56,7 @@ protected:
 
 protected:
 	/* 成员变量 */
+	static char msgid_;
 	boost::asio::io_service *ios_;	//< io_service对象. 从内部结束程序
 	bool asdaemon_;		//< 以守护服务模式运行程序
 	Parameter param_;	//< 参数
@@ -74,7 +75,7 @@ protected:
 	AstroMetryPtr astro_;		//< 接口: 天文定位
 	MatchCatPtr   match_;		//< 接口: 匹配星表
 	PhotoMetryPtr photo_;		//< 接口: 测光
-	FindPVVec finder_;			//< 接口: 运动目标关联
+	FindPVVec finders_;			//< 接口: 运动目标关联
 	threadptr thrd_reduct_;		//< 线程: 图像处理
 	threadptr thrd_astro_;		//< 线程: 天文定位
 	threadptr thrd_match_;		//< 线程: 匹配星表

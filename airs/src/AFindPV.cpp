@@ -30,7 +30,6 @@ AFindPV::AFindPV(Parameter *prmEnv) {
 AFindPV::~AFindPV() {
 	thrd_newfrm_->interrupt();
 	badpixes_.clear();
-	refstars_.clear();
 	thrd_newfrm_->join();
 }
 
@@ -75,95 +74,82 @@ void AFindPV::thread_newframe() {
 			if (frame->fno < last_fno_) {
 				end_sequence();
 				new_sequence(frame);
+				create_dir(frame);
 			}
-			create_dir(frame);
-			cross_ot(frame);
+			cross_badpixel(frame);
 			upload_ot(frame);
 			new_frame(frame);
-			end_frame(frame);
+			end_frame();
 		}
 	}
 }
 
 void AFindPV::new_frame(FramePtr frame) {
+	frmprev_  = frmnow_;
+	frmnow_   = frame;
+	last_fno_ = frmnow_->fno;
 
+	if (track_mode_ == TRACK_MODE_ERROR && frmprev_.use_count()) {
+		// 计算跟踪模式
+	}
 }
 
-void AFindPV::end_frame(FramePtr frame) {
+void AFindPV::end_frame() {
 	// 关联候选体
-
-	// 保存环境变量
-	frmprev_  = frame;
-	last_fno_ = frame->fno;
+	// 1. 剔除无效候选体
+	// 2. 输出终结候选体
+	// 3. 检测输出目标的有效性
+	check_candidates();
+	create_candidate();
 }
 
 void AFindPV::new_sequence(FramePtr frame) {
-	// 采用窗口: 3x pixel=±1.5pixel
-	wratio_ = 3600. / 3. / frame->scale;
+	track_mode_ = TRACK_MODE_ERROR;
 }
 
 void AFindPV::end_sequence() {
+	end_frame();
+	candidate_to_object();
 	/*
 	 * - 检查候选体合法性
 	 * - 将候选体转换为关联目标
 	 * - 输出关联目标数据至文件或其它终端
 	 */
 
-	// 清理环境变量
-	refstars_.clear();
+	frmprev_.reset();
+	frmnow_.reset();
 }
 
-void AFindPV::cross_ot(FramePtr frame) {
-	if (refstars_.size()) {// 已构建模板: 与模板交叉
-		cross_with_module(frame);
-		cross_with_prev(frame);
-	}
-	else {// 未构建模板: 建立模板
-		NFObjVec &objs = frame->nfobjs;
-		int npts = objs.size(), i;
+void AFindPV::cross_badpixel(FramePtr frame) {
+	NFObjVec& objs = frame->nfobjs;
 
-		for (i = 0; i < npts; ++i) {
-			if (objs[i]->matched == 1) {
-				RefStar star(objs[i]->ra_cat, objs[i]->dec_cat);
-				index_star(star);
-				refstars_.push_back(star);
-			}
-		}
+	for (NFObjVec::iterator it = objs.begin(); it != objs.end(); ++it) {
+		if ((*it)->matched == 0
+				&& is_badpix((*it)->features[NDX_X], (*it)->features[NDX_Y]))
+			(*it)->matched = 2;
 	}
 }
 
-void AFindPV::cross_with_module(FramePtr frame) {
-	NFObjVec &objs = frame->nfobjs;
-	int npts = objs.size(), i;
-	int& notOt = frame->notOt;
-
-	for (i = 0; notOt < npts && i < npts; ++i) {
-		if (objs[i]->matched) continue;
+bool AFindPV::is_badpix(double x, double y) {
+	for (BadPixVec::iterator it = badpixes_.begin(); it != badpixes_.end(); ++it) {
+		if (fabs(it->x - x) <= prmPV_.rbadpix
+				&& fabs(it->y - y) <= prmPV_.rbadpix)
+			return true;
 	}
+
+	return false;
 }
 
-void AFindPV::cross_with_prev(FramePtr frame) {
-	NFObjVec &objs = frame->nfobjs;
-	int npts = objs.size(), i;
-	int& notOt = frame->notOt;
-	if (!frmprev_.unique()) return;
+void AFindPV::create_candidate() {
 
-	for (i = 0; notOt < npts && i < npts; ++i) {
-		if (objs[i]->matched) continue;
-	}
 }
 
-void AFindPV::index_star(RefStar& star) {
-	int& idxr = star.idxr;
-	int& idxd = star.idxd;
+void AFindPV::check_candidates() {
 
-	/*
-	 * wsample_:
-	 */
-	if (idxr == 0 && idxd == 0) {
-		idxr = int(star.ra * cos(star.dec * D2R) * wratio_ + 0.5);
-		idxd = int(star.dec * wratio_ + 0.5);
-	}
+}
+
+void AFindPV::candidate_to_object() {
+
 }
 
 void AFindPV::create_dir(FramePtr frame) {

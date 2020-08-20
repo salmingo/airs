@@ -21,6 +21,22 @@
 
 namespace AstroUtil {
 //////////////////////////////////////////////////////////////////////////////
+enum {
+	TRACK_MODE_ERROR = -1,
+	TRACK_MODE_FREEZE,
+	TRACK_MODE_SID,
+	TRACK_MODE_ORBIT
+};
+
+typedef struct param_pv {
+	double rbadpix;		//< '坏像素'交叉半径
+
+public:
+	param_pv() {
+		rbadpix = 2.;
+	}
+} ParamPV;
+
 /*!
  * @struct bad_pixel 坏像素. 例如: 热点
  * - 判定对象: 候选体
@@ -30,24 +46,6 @@ typedef struct bad_pixel {
 	double x, y;
 } BadPix;
 typedef std::vector<BadPix> BadPixVec;	//< 坏像素列表
-
-typedef struct refstar {
-	double ra, dec;	//< 赤道坐标, 量纲: 角度
-	int idxr, idxd;	//< 坐标对应的索引
-
-public:
-	refstar() {
-		ra = dec = 0.;
-		idxr = idxd = 0;
-	}
-
-	refstar(double _ra, double _dec) {
-		ra  = _ra;
-		dec = _dec;
-		idxr = idxd = 0;
-	}
-} RefStar;
-typedef std::vector<RefStar> RefStarVec;	//< 参考星列表
 
 //////////////////////////////////////////////////////////////////////////////
 class AFindPV {
@@ -70,11 +68,13 @@ protected:
 	boost::mutex mtx_frmque_;	//< 互斥锁: 图像队列
 	threadptr thrd_newfrm_;		//< 线程: 循环处理图像队列
 	FrameQue frmque_;	//< 队列: 待处理图像
-	FramePtr frmprev_;	//< 图像帧: 上一帧, 用作模板
+	FramePtr frmnow_;	//< 图像帧: 当前帧
+	FramePtr frmprev_;	//< 图像帧: 上一帧
 	int last_fno_;	//< 最后一个帧编号
 	/* 控制变量 */
-	int mjday_;		//< 日期, 修正儒略日的整数部分
-	double wratio_;	//< 采用窗口的倒数, 量纲: 角度^-1
+	ParamPV prmPV_;		//< PV检测参数
+	int mjday_;			//< 日期, 修正儒略日的整数部分
+	int track_mode_;	//< 转台跟踪模式. 0: 静止; 1: 恒星; 2: 轨迹; -1: 未定义
 
 	/* 输出处理结果 */
 	int idpv_;			//< 目标序号
@@ -85,7 +85,6 @@ protected:
 	boost::shared_ptr<DBCurl> dbt_;		//< 数据库接口
 
 	BadPixVec badpixes_;	//< "坏像素"列表
-	RefStarVec refstars_;	//< 一个处理流程中的参考星模板
 
 public:
 	/* 接口 */
@@ -115,7 +114,7 @@ protected:
 	/*!
 	 * @brief 新的图像帧数据完成处理
 	 */
-	void end_frame(FramePtr frame);
+	void end_frame();
 	/*!
 	 * @brief 启动新的批处理流程
 	 */
@@ -125,18 +124,25 @@ protected:
 	 */
 	void end_sequence();
 	/*!
-	 * @brief 与"模板"交叉识别图像中的恒星和瞬变源
-	 * @param frame 最新的图像帧数据
+	 * @brief 交叉检测'坏像素'
 	 */
-	void cross_ot(FramePtr frame);
-	void cross_with_module(FramePtr frame);
-	void cross_with_prev(FramePtr frame);
+	void cross_badpixel(FramePtr frame);
 	/*!
-	 * @brief 计算恒星的索引
-	 * @note
-	 * 由坐标计算索引
+	 * @brief 检测(x,y)指向位置是否坏像素
 	 */
-	void index_star(RefStar& star);
+	bool is_badpix(double x, double y);
+	/*!
+	 * @brief 由相邻帧创建候选体
+	 */
+	void create_candidate();
+	/*!
+	 * @brief 检查候选体的有效性
+	 */
+	void check_candidates();
+	/*!
+	 * @brief 候选体转换为目标
+	 */
+	void candidate_to_object();
 
 protected:
 	/* 功能: 数据输出 */
