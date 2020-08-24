@@ -136,9 +136,13 @@ protected:
 	 */
 	void create_candidate();
 	/*!
+	 * @brief 尝试将最新帧数据加入候选体
+	 */
+	void append_candidate();
+	/*!
 	 * @brief 检查候选体的有效性
 	 */
-	void check_candidates();
+	void check_candidate();
 	/*!
 	 * @brief 候选体转换为目标
 	 */

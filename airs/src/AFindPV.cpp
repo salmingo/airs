@@ -91,7 +91,20 @@ void AFindPV::new_frame(FramePtr frame) {
 
 	if (track_mode_ == TRACK_MODE_ERROR && frmprev_.use_count()) {
 		// 计算跟踪模式
+		double dt = frmnow_->secofday - frmprev_->secofday;
+		double dr = frmnow_->rac - frmprev_->rac;
+		double dd = frmnow_->decc - frmprev_->decc;
+		double rater, rated;
+		if (dr > 180.) dr -= 360.;
+		else if (dr < -180.) dr += 360.;
+		rater = dr * 3600. / dt;
+		rated = dd * 3600. / dt;
+
+		if (fabs(rater - 15.) < 2. && fabs(rated) < 2.) track_mode_ = TRACK_MODE_FREEZE;
+		else if (fabs(rater) < 2. && fabs(rated) < 2.)  track_mode_ = TRACK_MODE_SID;
+		else track_mode_ = TRACK_MODE_ORBIT;
 	}
+	append_candidate();	// 帧数据加入候选体
 }
 
 void AFindPV::end_frame() {
@@ -99,12 +112,14 @@ void AFindPV::end_frame() {
 	// 1. 剔除无效候选体
 	// 2. 输出终结候选体
 	// 3. 检测输出目标的有效性
-	check_candidates();
+	check_candidate();
 	create_candidate();
 }
 
 void AFindPV::new_sequence(FramePtr frame) {
 	track_mode_ = TRACK_MODE_ERROR;
+	frmprev_.reset();
+	frmnow_.reset();
 }
 
 void AFindPV::end_sequence() {
@@ -115,9 +130,6 @@ void AFindPV::end_sequence() {
 	 * - 将候选体转换为关联目标
 	 * - 输出关联目标数据至文件或其它终端
 	 */
-
-	frmprev_.reset();
-	frmnow_.reset();
 }
 
 void AFindPV::cross_badpixel(FramePtr frame) {
@@ -144,7 +156,7 @@ void AFindPV::create_candidate() {
 
 }
 
-void AFindPV::check_candidates() {
+void AFindPV::check_candidate() {
 
 }
 
