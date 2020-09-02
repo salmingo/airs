@@ -3,7 +3,7 @@
  * @version 0.1
  * @date 2019-10-15
  */
-
+#include <boost/bind.hpp>
 #include <boost/make_shared.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
