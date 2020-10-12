@@ -3,9 +3,10 @@
  * @version 0.1
  * @date 2019-10-15
  */
-#include <boost/bind.hpp>
+#include <boost/bind/bind.hpp>
 #include <boost/make_shared.hpp>
 #include <boost/filesystem.hpp>
+#include <boost/chrono/include.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include "DoProcess.h"
 #include "GLog.h"
@@ -14,6 +15,7 @@
 using namespace boost;
 using namespace boost::filesystem;
 using namespace boost::posix_time;
+using namespace boost::placeholders;
 
 char DoProcess::msgid_ = 0;
 
@@ -105,6 +107,9 @@ void DoProcess::MatchCatalogResult(bool rslt) {
 		mutex_lock lck(mtx_frm_photo_);
 		quePhoto_.push_back(frame);
 		cv_photo_.notify_one();
+	}
+	if (rslt && tcpc_gc_.unique()) {// 导星?
+
 	}
 	cv_match_.notify_one();
 }
