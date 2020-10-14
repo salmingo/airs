@@ -108,8 +108,21 @@ void DoProcess::MatchCatalogResult(bool rslt) {
 		quePhoto_.push_back(frame);
 		cv_photo_.notify_one();
 	}
-	if (rslt && tcpc_gc_.unique()) {// 导星?
+	if (rslt && tcpc_gc_.unique()
+			&& valid_ra(frame->rac) && valid_dec(frame->decc)
+			&& valid_ra(frame->raobj) && valid_dec(frame->decobj)) {
+		apguide proto  = boost::make_shared<ascii_proto_guide>();
+		proto->gid = frame->gid;
+		proto->uid = frame->uid;
+		proto->cid = frame->cid;
+		proto->ra  = frame->rac;
+		proto->dec = frame->decc;
+		proto->objra  = frame->raobj;
+		proto->objdec = frame->decobj;
 
+		int n;
+		const char *s = ascproto_->CompactGuide(proto, n);
+		tcpc_gc_->Write(s, n);
 	}
 	cv_match_.notify_one();
 }
@@ -192,6 +205,10 @@ bool DoProcess::check_image(FramePtr frame) {
 		frame->uid = temp;
 		fits_read_key(fitsptr, TSTRING, "CAM_ID", temp, NULL, &status);
 		frame->cid = temp;
+
+		fits_read_key(fitsptr, TDOUBLE, "OBJCTRA",  &frame->raobj,  NULL, &status);
+		fits_read_key(fitsptr, TDOUBLE, "OBJCTDEC", &frame->decobj, NULL, &status);
+
 		status = 0;
 	}
 	fits_close_file(fitsptr, &status);

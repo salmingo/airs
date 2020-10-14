@@ -7,6 +7,7 @@
 #include <boost/make_shared.hpp>
 #include <boost/algorithm/string.hpp>
 #include "AsciiProtocol.h"
+#include "GLog.h"
 
 using namespace boost;
 
@@ -22,8 +23,8 @@ bool valid_dec(double dec) {
 /*!
  * @brief 检查图像类型
  */
-IMAGE_TYPE check_imgtype(string imgtype, string &sabbr) {
-	IMAGE_TYPE itype(IMGTYPE_ERROR);
+int check_imgtype(string imgtype, string &sabbr) {
+	int itype(IMGTYPE_ERROR);
 
 	if (iequals(imgtype, "bias")) {
 		itype = IMGTYPE_BIAS;
@@ -152,6 +153,19 @@ const char *AsciiProtocol::CompactObsSite(apobsite proto, int &n) {
 	return output_compacted(output, n);
 }
 
+const char *AsciiProtocol::CompactLoadPlan(int &n) {
+	return output_compacted(APTYPE_LOADPLAN, n);
+}
+
+const char *AsciiProtocol::CompactAbortPlan(apabtplan proto, int &n) {
+	if (!proto.use_count()) return NULL;
+
+	string output;
+	compact_base(to_apbase(proto), output);
+	join_kv(output, "plan_sn",  proto->plan_sn);
+	return output_compacted(output, n);
+}
+
 const char *AsciiProtocol::CompactHomeSync(aphomesync proto, int &n) {
 	if (!proto.use_count()
 			|| !(valid_ra(proto->ra) && valid_dec(proto->dec)))
@@ -228,6 +242,34 @@ const char *AsciiProtocol::CompactPark(int &n) {
 	return output_compacted(APTYPE_PARK, n);
 }
 
+const char *AsciiProtocol::CompactGuide(apguide proto, int &n) {
+	if (!proto.use_count()
+			|| !(valid_ra(proto->ra) && valid_dec(proto->dec)))
+		return NULL;
+
+	string output;
+	compact_base(to_apbase(proto), output);
+	// 真实指向位置或位置偏差
+	join_kv(output, "ra",       proto->ra);
+	join_kv(output, "dec",      proto->dec);
+	// 当(ra,dec)和目标位置同时有效时, (ra,dec)指代真实位置而不是位置偏差
+	if (valid_ra(proto->objra) && valid_dec(proto->objdec)) {
+		join_kv(output, "objra",    proto->objra);
+		join_kv(output, "objdec",   proto->objdec);
+	}
+
+	return output_compacted(output, n);
+}
+
+const char *AsciiProtocol::CompactGuide(double ra, double dec, int &n) {
+	string output = APTYPE_GUIDE;
+	output += " ";
+	join_kv(output, "ra",    ra);
+	join_kv(output, "dec",   dec);
+
+	return output_compacted(output, n);
+}
+
 const char *AsciiProtocol::CompactAbortSlew(apabortslew proto, int &n) {
 	if (!proto.use_count()) return NULL;
 
@@ -289,6 +331,7 @@ const char *AsciiProtocol::CompactSlit(apslit proto, int &n) {
 	compact_base(to_apbase(proto), output);
 	if (proto->state   != INT_MIN) join_kv(output, "state",    proto->state);
 	if (proto->command != INT_MIN) join_kv(output, "command",  proto->command);
+	if (proto->enable == 0 || proto->enable == 1) join_kv(output, "enable", proto->enable);
 	return output_compacted(output, n);
 }
 
@@ -340,6 +383,8 @@ const char *AsciiProtocol::CompactObject(apobject proto, int &n) {
 	join_kv(output, "objname",    proto->objname);
 	join_kv(output, "btime",      proto->btime);
 	join_kv(output, "etime",      proto->etime);
+	if (valid_ra(proto->raobj))   join_kv(output, "objra", proto->raobj);
+	if (valid_dec(proto->decobj)) join_kv(output, "objdec", proto->decobj);
 	join_kv(output, "imgtype",    proto->imgtype);
 	join_kv(output, "sabbr",      proto->sabbr);
 	join_kv(output, "iimgtyp",    proto->iimgtyp);
@@ -400,8 +445,14 @@ apbase AsciiProtocol::Resolve(const char *rcvd) {
 	likv kvs;
 	ascii_proto_base basis;
 
+#ifdef NDEBUG
+	_gLog.Write("ascii received [%s]", rcvd);
+#endif
+
 	// 提取协议类型
 	for (ptr = rcvd; *ptr && *ptr != ' '; ++ptr) type += *ptr;
+	if (type.empty()) return proto;
+
 	while (*ptr && *ptr == ' ') ++ptr;
 	// 分解键值对
 	if (*ptr) algorithm::split(tokens, ptr, is_any_of(seps), token_compress_on);
@@ -410,6 +461,7 @@ apbase AsciiProtocol::Resolve(const char *rcvd) {
 	if ((ch = type[0]) == 'a') {
 		if      (iequals(type, APTYPE_ABTSLEW))  proto = resolve_abortslew(kvs);
 		else if (iequals(type, APTYPE_ABTIMG))   proto = resolve_abortimg(kvs);
+		else if (iequals(type, APTYPE_ABTPLAN))  proto = resolve_abortplan(kvs);
 	}
 	else if (ch == 'f') {
 		if      (iequals(type, APTYPE_FILEINFO)) proto = resolve_fileinfo(kvs);
@@ -435,8 +487,10 @@ apbase AsciiProtocol::Resolve(const char *rcvd) {
 		if (iequals(type, APTYPE_TAKIMG))        proto = resolve_takeimg(kvs);
 		else if (iequals(type, APTYPE_TRACK))    proto = resolve_track(kvs);
 	}
+	else if (iequals(type, APTYPE_GUIDE))    proto = resolve_guide(kvs);
 	else if (iequals(type, APTYPE_CAMERA))   proto = resolve_camera(kvs);
 	else if (iequals(type, APTYPE_EXPOSE))   proto = resolve_expose(kvs);
+	else if (iequals(type, APTYPE_LOADPLAN)) proto = resolve_loadplan(kvs);
 	else if (iequals(type, APTYPE_MOUNT))    proto = resolve_mount(kvs);
 	else if (iequals(type, APTYPE_PARK))     proto = resolve_park(kvs);
 	else if (iequals(type, APTYPE_HOMESYNC)) proto = resolve_homesync(kvs);
@@ -453,18 +507,15 @@ apbase AsciiProtocol::Resolve(const char *rcvd) {
 }
 
 apbase AsciiProtocol::resolve_register(likv &kvs) {
-	apreg proto = boost::make_shared<ascii_proto_reg>();
-	return to_apbase(proto);
+	return to_apbase(boost::make_shared<ascii_proto_reg>());
 }
 
 apbase AsciiProtocol::resolve_start(likv &kvs) {
-	apstart proto = boost::make_shared<ascii_proto_start>();
-	return to_apbase(proto);
+	return to_apbase(boost::make_shared<ascii_proto_start>());
 }
 
 apbase AsciiProtocol::resolve_stop(likv &kvs) {
-	apstop proto = boost::make_shared<ascii_proto_stop>();
-	return to_apbase(proto);
+	return to_apbase(boost::make_shared<ascii_proto_stop>());
 }
 
 apbase AsciiProtocol::resolve_obsite(likv &kvs) {
@@ -480,6 +531,20 @@ apbase AsciiProtocol::resolve_obsite(likv &kvs) {
 		else if (iequals(keyword, "altitude"))  proto->alt      = stod((*it).value);
 		else if (iequals(keyword, "timezone"))  proto->timezone = stoi((*it).value);
 	}
+	return to_apbase(proto);
+}
+
+apbase AsciiProtocol::resolve_loadplan(likv &kvs) {
+	return to_apbase(boost::make_shared<ascii_proto_loadplan>());
+}
+
+apbase AsciiProtocol::resolve_abortplan(likv &kvs) {
+	apabtplan proto = boost::make_shared<ascii_proto_abortplan>();
+
+	for (likv::iterator it = kvs.begin(); it != kvs.end(); ++it) {// 遍历键值对
+		if (iequals((*it).keyword, "plan_sn")) proto->plan_sn = (*it).value;
+	}
+
 	return to_apbase(proto);
 }
 
@@ -528,13 +593,27 @@ apbase AsciiProtocol::resolve_track(likv &kvs) {
 }
 
 apbase AsciiProtocol::resolve_park(likv &kvs) {
-	appark proto = boost::make_shared<ascii_proto_park>();
+	return to_apbase(boost::make_shared<ascii_proto_park>());
+}
+
+apbase AsciiProtocol::resolve_guide(likv &kvs) {
+	apguide proto = boost::make_shared<ascii_proto_guide>();
+	string keyword;
+
+	for (likv::iterator it = kvs.begin(); it != kvs.end(); ++it) {// 遍历键值对
+		keyword = (*it).keyword;
+		// 识别关键字
+		if      (iequals(keyword, "ra"))       proto->ra     = stod((*it).value);
+		else if (iequals(keyword, "dec"))      proto->dec    = stod((*it).value);
+		else if (iequals(keyword, "objra"))    proto->objra  = stod((*it).value);
+		else if (iequals(keyword, "objdec"))   proto->objdec = stod((*it).value);
+	}
+
 	return to_apbase(proto);
 }
 
 apbase AsciiProtocol::resolve_abortslew(likv &kvs) {
-	apabortslew proto = boost::make_shared<ascii_proto_abort_slew>();
-	return to_apbase(proto);
+	return to_apbase(boost::make_shared<ascii_proto_abort_slew>());
 }
 
 apbase AsciiProtocol::resolve_mount(likv &kvs) {
@@ -557,12 +636,9 @@ apbase AsciiProtocol::resolve_mount(likv &kvs) {
 
 apbase AsciiProtocol::resolve_fwhm(likv &kvs) {
 	apfwhm proto = boost::make_shared<ascii_proto_fwhm>();
-	string keyword;
 
 	for (likv::iterator it = kvs.begin(); it != kvs.end(); ++it) {// 遍历键值对
-		keyword = (*it).keyword;
-		// 识别关键字
-		if (iequals(keyword, "value"))  proto->value = stod((*it).value);
+		if (iequals((*it).keyword, "value")) proto->value = stod((*it).value);
 	}
 
 	return to_apbase(proto);
@@ -591,6 +667,7 @@ apbase AsciiProtocol::resolve_slit(likv &kvs) {
 		// 识别关键字
 		if      (iequals(keyword, "state"))    proto->state   = stoi((*it).value);
 		else if (iequals(keyword, "command"))  proto->command = stoi((*it).value);
+		else if (iequals(keyword, "enable"))   proto->enable  = stoi((*it).value);
 	}
 
 	return to_apbase(proto);
@@ -598,12 +675,9 @@ apbase AsciiProtocol::resolve_slit(likv &kvs) {
 
 apbase AsciiProtocol::resolve_rain(likv &kvs) {
 	aprain proto = boost::make_shared<ascii_proto_rain>();
-	string keyword;
 
 	for (likv::iterator it = kvs.begin(); it != kvs.end(); ++it) {// 遍历键值对
-		keyword = (*it).keyword;
-		// 识别关键字
-		if (iequals(keyword, "value")) proto->value = stoi((*it).value);
+		if (iequals((*it).keyword, "value")) proto->value = stoi((*it).value);
 	}
 
 	return to_apbase(proto);
@@ -626,8 +700,7 @@ apbase AsciiProtocol::resolve_takeimg(likv &kvs) {
 }
 
 apbase AsciiProtocol::resolve_abortimg(likv &kvs) {
-	apabortimg proto = boost::make_shared<ascii_proto_abort_image>();
-	return to_apbase(proto);
+	return to_apbase(boost::make_shared<ascii_proto_abort_image>());
 }
 
 apbase AsciiProtocol::resolve_object(likv &kvs) {
@@ -648,7 +721,11 @@ apbase AsciiProtocol::resolve_object(likv &kvs) {
 			if      (iequals(keyword, "imgtype"))     proto->imgtype   = (*it).value;
 			else if (iequals(keyword, "iimgtyp"))     proto->iimgtyp   = stoi((*it).value);
 		}
-		else if (iequals(keyword, "objname"))         proto->objname   = (*it).value;
+		else if ((ch = keyword[0] == 'o')) {
+			if (iequals(keyword, "objname"))          proto->objname   = (*it).value;
+			else if (iequals(keyword, "objra"))       proto->raobj     = stod((*it).value);
+			else if (iequals(keyword, "objdec"))      proto->decobj    = stod((*it).value);
+		}
 		else if (ch == 'p') {
 			if      (iequals(keyword, "plan_sn"))     proto->plan_sn   = (*it).value;
 			else if (iequals(keyword, "plan_type"))   proto->plan_type = stoi((*it).value);
@@ -661,12 +738,9 @@ apbase AsciiProtocol::resolve_object(likv &kvs) {
 
 apbase AsciiProtocol::resolve_expose(likv &kvs) {
 	apexpose proto = boost::make_shared<ascii_proto_expose>();
-	string keyword;
 
 	for (likv::iterator it = kvs.begin(); it != kvs.end(); ++it) {// 遍历键值对
-		keyword = (*it).keyword;
-		// 识别关键字
-		if (iequals(keyword, "command")) proto->command = stoi((*it).value);
+		if (iequals((*it).keyword, "command")) proto->command = stoi((*it).value);
 	}
 
 	return to_apbase(proto);
@@ -679,9 +753,9 @@ apbase AsciiProtocol::resolve_camera(likv &kvs) {
 	for (likv::iterator it = kvs.begin(); it != kvs.end(); ++it) {// 遍历键值对
 		keyword = (*it).keyword;
 		// 识别关键字
-		if      (iequals(keyword, "state"))     proto->state     = stoi((*it).value);
-		else if (iequals(keyword, "errcode"))   proto->errcode   = stoi((*it).value);
-		else if (iequals(keyword, "coolget"))   proto->coolget   = stod((*it).value);
+		if      (iequals(keyword, "state"))     proto->state   = stoi((*it).value);
+		else if (iequals(keyword, "errcode"))   proto->errcode = stoi((*it).value);
+		else if (iequals(keyword, "coolget"))   proto->coolget = stod((*it).value);
 	}
 
 	return to_apbase(proto);
@@ -705,12 +779,9 @@ apbase AsciiProtocol::resolve_fileinfo(likv &kvs) {
 
 apbase AsciiProtocol::resolve_filestat(likv &kvs) {
 	apfilestat proto = boost::make_shared<ascii_proto_filestat>();
-	string keyword;
 
 	for (likv::iterator it = kvs.begin(); it != kvs.end(); ++it) {// 遍历键值对
-		keyword = (*it).keyword;
-		// 识别关键字
-		if (iequals(keyword, "status")) proto->status = stoi((*it).value);
+		if (iequals((*it).keyword, "status")) proto->status = stoi((*it).value);
 	}
 
 	return to_apbase(proto);

@@ -20,12 +20,16 @@ using std::list;
 #define APTYPE_START	"start"
 #define APTYPE_STOP		"stop"
 #define APTYPE_OBSITE	"obsite"
+#define APTYPE_LOADPLAN	"load_plan"
+#define APTYPE_ABTPLAN	"abort_plan"
 
 #define APTYPE_HOMESYNC	"home_sync"
 #define APTYPE_SLEWTO	"slewto"
 #define APTYPE_TRACK	"track"
 #define APTYPE_PARK		"park"
+#define APTYPE_GUIDE	"guide"
 #define APTYPE_ABTSLEW	"abort_slew"
+#define APTYPE_PRESLEW	"preslew"
 #define APTYPE_MOUNT	"mount"
 
 #define APTYPE_RAIN		"rain"
@@ -83,6 +87,24 @@ public:
 };
 typedef boost::shared_ptr<ascii_proto_obsite> apobsite;
 
+struct ascii_proto_loadplan : public ascii_proto_base {// 加载观测计划
+public:
+	ascii_proto_loadplan() {
+		type = APTYPE_LOADPLAN;
+	}
+};
+typedef boost::shared_ptr<ascii_proto_loadplan> aploadplan;
+
+struct ascii_proto_abortplan : public ascii_proto_base {// 加载观测计划
+	string plan_sn;		//< 计划编号
+
+public:
+	ascii_proto_abortplan() {
+		type = APTYPE_ABTPLAN;
+	}
+};
+typedef boost::shared_ptr<ascii_proto_abortplan> apabtplan;
+
 /* 转台/望远镜 */
 struct ascii_proto_home_sync : public ascii_proto_base {// 同步零点
 	double ra;		//< 赤经, 量纲: 角度
@@ -131,6 +153,21 @@ public:
 };
 typedef boost::shared_ptr<ascii_proto_park> appark;
 
+struct ascii_proto_guide : public ascii_proto_base {// 导星
+	double ra;		//< 指向位置对应的天球坐标-赤经, 或赤经偏差, 量纲: 角度
+	double dec;		//< 指向位置对应的天球坐标-赤纬, 或赤纬偏差, 量纲: 角度
+	double objra;	//< 目标赤经, 量纲: 角度
+	double objdec;	//< 目标赤纬, 量纲: 角度
+
+public:
+	ascii_proto_guide() {
+		type = APTYPE_GUIDE;
+		ra = dec = 1E30;
+		objra = objdec = 1E30;
+	}
+};
+typedef boost::shared_ptr<ascii_proto_guide> apguide;
+
 struct ascii_proto_abort_slew : public ascii_proto_base {// 中止指向
 public:
 	ascii_proto_abort_slew() {
@@ -138,6 +175,14 @@ public:
 	}
 };
 typedef boost::shared_ptr<ascii_proto_abort_slew> apabortslew;
+
+struct ascii_proto_preslew : public ascii_proto_base {// 指向预热
+public:
+	ascii_proto_preslew() {
+		type = APTYPE_PRESLEW;
+	}
+};
+typedef boost::shared_ptr<ascii_proto_preslew> appreslew;
 
 struct ascii_proto_mount : public ascii_proto_base {// 转台信息
 	int state;		//< 工作状态
@@ -150,7 +195,7 @@ struct ascii_proto_mount : public ascii_proto_base {// 转台信息
 public:
 	ascii_proto_mount() {
 		type    = APTYPE_MOUNT;
-		state   = TELESCOPE_ERROR;
+		state   = 0;
 		errcode = INT_MIN;
 		ra = dec = 1E30;
 		azi = alt = 1E30;
@@ -190,6 +235,8 @@ struct ascii_proto_object : public ascii_proto_base {// 目标信息与曝光参
 	string objname;		//< 目标名
 	string btime;		//< 曝光起始时间, 格式: YYYYMMDDThhmmss
 	string etime;		//< 曝光结束时间
+	double  raobj;		//< 目标赤经, 量纲: 角度
+	double  decobj;		//< 目标赤纬, 量纲: 角度
 	/* 曝光控制信息 */
 	string imgtype;		//< 图像类型
 	string sabbr;		//< 目标名称缩略字, 用于文件名标志图像类型
@@ -201,6 +248,7 @@ public:
 	ascii_proto_object() {
 		type   = APTYPE_OBJECT;
 		plan_type = 0;
+		raobj = decobj = -1000.0;
 		expdur = 0.0;
 		frmcnt = -1;
 		iimgtyp = IMGTYPE_ERROR;
@@ -233,7 +281,7 @@ struct ascii_proto_camera : public ascii_proto_base {// 转台信息
 public:
 	ascii_proto_camera() {
 		type    = APTYPE_CAMERA;
-		state   = TELESCOPE_ERROR;
+		state   = CAMCTL_ERROR;
 		errcode = INT_MIN;
 		coolget = 0.0f;
 	}
@@ -267,12 +315,14 @@ typedef boost::shared_ptr<ascii_proto_focus> apfocus;
 struct ascii_proto_slit : public ascii_proto_base {// 天窗状态
 	int state;		//< 状态
 	int command;	//< 指令
+	int enable;		//< 启用/禁用天窗. 0: 禁用; 1: 启用; 其它: 未定义
 
 public:
 	ascii_proto_slit() {
 		type    = APTYPE_SLIT;
 		command = INT_MIN;
 		state   = INT_MIN;
+		enable  = -1;
 	}
 };
 typedef boost::shared_ptr<ascii_proto_slit> apslit;
@@ -405,6 +455,14 @@ public:
 	 * @brief 封装测站位置参数
 	 */
 	const char *CompactObsSite(apobsite proto, int &n);
+	/*!
+	 * @brief 封装: 加载观测计划
+	 */
+	const char *CompactLoadPlan(int &n);
+	/*!
+	 * @brief 封装: 中止观测计划
+	 */
+	const char *CompactAbortPlan(apabtplan proto, int &n);
 	/**
 	 * @brief 封装同步零点指令
 	 */
@@ -425,6 +483,11 @@ public:
 	 */
 	const char *CompactPark(appark proto, int &n);
 	const char *CompactPark(int &n);
+	/**
+	 * @brief 封装导星指令
+	 */
+	const char *CompactGuide(apguide proto, int &n);
+	const char *CompactGuide(double ra, double dec, int &n);
 	/**
 	 * @brief 封装中止指向指令
 	 */
@@ -519,6 +582,14 @@ protected:
 	 * @brief 解析测站参数
 	 */
 	apbase resolve_obsite(likv &kvs);
+	/*!
+	 * @brief 解析: 加载观测计划
+	 */
+	apbase resolve_loadplan(likv &kvs);
+	/*!
+	 * @brief 解析: 中止观测计划
+	 */
+	apbase resolve_abortplan(likv &kvs);
 	/**
 	 * @brief 同步零点, 修正转台零点偏差
 	 */
@@ -535,6 +606,10 @@ protected:
 	 * @brief 复位至安全位置, 到位后保持静止
 	 */
 	apbase resolve_park(likv &kvs);
+	/**
+	 * @brief 导星, 微量修正当前指向位置
+	 */
+	apbase resolve_guide(likv &kvs);
 	/**
 	 * @brief 中止指向过程
 	 */
@@ -613,6 +688,6 @@ extern bool valid_dec(double dec);
  * @return
  * 图像类型有效性
  */
-IMAGE_TYPE check_imgtype(string imgtype, string &sabbr);
+int check_imgtype(string imgtype, string &sabbr);
 
 #endif /* ASCIIPROTOCOL_H_ */

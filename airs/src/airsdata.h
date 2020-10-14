@@ -82,6 +82,7 @@ struct OneFrame {
 	double expdur;		//< 曝光时间, 量纲: 秒
 	double secofday;	//< 当日秒数
 	double mjd;			//< 修正儒略日: 曝光中间时刻
+	double raobj, decobj;//< 指向目标位置
 	/* 网络标志 */
 	string gid;		//< 组标志
 	string uid;		//< 单元ID
