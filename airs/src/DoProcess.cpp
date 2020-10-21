@@ -3,6 +3,7 @@
  * @version 0.1
  * @date 2019-10-15
  */
+
 #include <boost/bind/bind.hpp>
 #include <boost/make_shared.hpp>
 #include <boost/filesystem.hpp>
@@ -16,8 +17,6 @@ using namespace boost;
 using namespace boost::filesystem;
 using namespace boost::posix_time;
 using namespace boost::placeholders;
-
-char DoProcess::msgid_ = 0;
 
 DoProcess::DoProcess() {
 	asdaemon_   = false;
@@ -41,7 +40,6 @@ bool DoProcess::StartService(bool asdaemon, boost::asio::io_service *ios) {
 		register_messages();
 		std::string name = "msgque_";
 		name += DAEMON_NAME;
-		name += ++msgid_;
 		if (!Start(name.c_str())) return false;
 		if (!connect_server_gc()) return false;
 		if (!connect_server_fileserver()) return false;
@@ -66,6 +64,14 @@ void DoProcess::ProcessImage(const string &filepath) {
 	frame->filepath = filepath;
 	queReduct_.push_back(frame);
 	cv_reduct_.notify_one();
+}
+
+bool DoProcess::IsOver() {
+	if (queReduct_.size()) return false;
+	for (FindPVVec::iterator it = finders_.begin(); it != finders_.end(); ++it) {
+		if (!(*it)->IsOver()) return false;
+	}
+	return true;
 }
 
 //////////////////////////////////////////////////////////////////////////////

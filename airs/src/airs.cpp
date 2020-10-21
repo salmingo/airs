@@ -1,7 +1,7 @@
 /**
  Name        : airs - Astronomical Image Reduction Software
  Author      : Xiaomeng Lu
- Version     :
+ Version     : 0.1
  Copyright   : SVOM@NAOC, CAS
  Description :
  功能:
@@ -11,6 +11,10 @@
  - 天文定位
  - 流量定标
  输出: 在输入FITS文件目录下, 以FITS文件名为名,
+ * @version 0.2
+ * @date 2020-10-20
+ * - 根目录多级遍历
+ * - 结束后自动退出
  */
 
 #include <getopt.h>
@@ -32,6 +36,7 @@ using namespace boost::filesystem;
 
 typedef vector<string> vecstr;
 boost::shared_ptr<GLog> _gLog;
+int _nProcess;
 
 /*!
  * @brief 显示使用说明
@@ -43,6 +48,34 @@ void Usage() {
 	printf(" -h / --help    : print this help message\n");
 	printf(" -d / --default : generate default configuration file here\n");
 	printf(" -s / --daemon  : run as daemon server\n\n");
+}
+
+void process_directory(const string &filepath) {
+	vecstr files;
+	int n;
+
+	for (directory_iterator x = directory_iterator(filepath); x != directory_iterator(); ++x) {
+		if (is_directory(x->path().string())) process_directory(x->path().string());
+		else if (x->path().extension().string().rfind(".fit") != string::npos) {
+			files.push_back(x->path().string());
+		}
+	}
+	if ((n = files.size()) > MINFRAME) {
+		// 等待其它处理完成
+		while (_nProcess) boost::this_thread::sleep_for(boost::chrono::seconds(30));
+
+		boost::asio::io_service ios;
+		boost::shared_ptr<DoProcess> doProcess = boost::make_shared<DoProcess>();
+		++_nProcess;
+		sort(files.begin(), files.end(), [](const string &name1, const string &name2) {
+			return name1 < name2;
+		});
+		doProcess->StartService(false, &ios);
+		for (int i = 0; i < n; ++i) doProcess->ProcessImage(files[i]);
+		while (!doProcess->IsOver()) boost::this_thread::sleep_for(boost::chrono::seconds(30));
+		doProcess->StopService();
+		--_nProcess;
+	}
 }
 
 int main(int argc, char **argv) {
@@ -93,47 +126,51 @@ int main(int argc, char **argv) {
 	boost::asio::io_service ios;
 	boost::asio::signal_set signals(ios, SIGINT, SIGTERM);  // interrupt signal
 	signals.async_wait(boost::bind(&boost::asio::io_service::stop, &ios));
+
 	_gLog = boost::make_shared<GLog>(is_daemon ? NULL : stdout);
+	boost::shared_ptr<DoProcess> doProcess = boost::make_shared<DoProcess>();
 	if (is_daemon) {
 		if (!MakeItDaemon(ios)) return 1;
 		if (!isProcSingleton(gPIDPath)) {
 			_gLog->Write("%s is already running or failed to access PID file", DAEMON_NAME);
 			return 2;
 		}
-
 		_gLog->Write("Try to launch %s %s as daemon", DAEMON_NAME, DAEMON_VERSION);
+		if (doProcess->StartService(is_daemon, &ios)) {
+			ios.run();
+			_gLog->Write("Daemon stop running");
+		}
+		else {
+			_gLog->Write(LOG_FAULT, NULL, "Fail to launch %s", DAEMON_NAME);
+		}
+		doProcess->StopService();
 	}
+	else {
+		_nProcess = 0;
 
-	boost::shared_ptr<DoProcess> doProcess = boost::make_shared<DoProcess>();
-	if (doProcess->StartService(is_daemon, &ios)) {
-		if (is_daemon) _gLog->Write("Daemon goes running");
-		if (!is_daemon) {
-			vecstr files;
-			int n;
-			for (int i = 0; i < argc; ++i) {
-				path pathname(argv[i]);
-				if (is_directory(pathname)) {
-					for (directory_iterator x = directory_iterator(pathname); x != directory_iterator(); ++x) {
-						if (x->path().extension().string().rfind(".fit") != string::npos) {
-							files.push_back(x->path().string());
-						}
-					}
-				}
-				else if (is_regular_file(pathname)) files.push_back(argv[i]);
-			}
+		vecstr files;
+		int n;
+		for (int i = 0; i < argc; ++i) {
+			path pathname(argv[i]);
+			if (is_directory(pathname)) process_directory(pathname.string());
+			else if (is_regular_file(pathname) && pathname.extension().string().rfind(".fit") != string::npos)
+				files.push_back(argv[i]);
+		}
+		if ((n = files.size()) > MINFRAME) {
+			while(_nProcess) boost::this_thread::sleep_for(boost::chrono::seconds(30));
+			++_nProcess;
 			sort(files.begin(), files.end(), [](const string &name1, const string &name2) {
 				return name1 < name2;
 			});
-			n = files.size();
-			for (int i = 0; i < n; ++i) 	doProcess->ProcessImage(files[i]);
+			doProcess->StartService(false, &ios);
+			for (int i = 0; i < n; ++i)
+				doProcess->ProcessImage(files[i]);
+			while (!doProcess->IsOver()) boost::this_thread::sleep_for(boost::chrono::seconds(30));
+			doProcess->StopService();
+			--_nProcess;
+			while(_nProcess) boost::this_thread::sleep_for(boost::chrono::seconds(30));
 		}
-		ios.run();
-		if (is_daemon) _gLog->Write("Daemon stop running");
 	}
-	else {
-		_gLog->Write(LOG_FAULT, NULL, "Fail to launch %s", DAEMON_NAME);
-	}
-	doProcess->StopService();
 
 	return 0;
 }

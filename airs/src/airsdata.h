@@ -110,6 +110,7 @@ public:
 		fno  = 0;
 		secofday = 0;
 		mjd  = 0;
+		raobj = decobj = 0.0;
 		expdur = 0.0;
 		fwhm = 0.0;
 		rac  = decc = 0.0;

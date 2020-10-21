@@ -24,7 +24,7 @@ LogCalibrated::~LogCalibrated() {
 // 输出内容: 文件名 曝光中间时间 中心指向 大气质量 星等拟合参数
 void LogCalibrated::Write(FramePtr frame) {
 	if (invalid_file(frame->tmmid)) {
-		fprintf(fp_, "%s %s %4.2f %9.5f %9.5f %9.5f %9.5f %6.3f %7.3f %8.6f\n",
+		fprintf(fp_, "%s %s %5.2f %9.5f %9.5f %9.5f %9.5f %6.3f %7.3f %8.6f\n",
 			frame->filename.c_str(), frame->tmmid.c_str(), frame->fwhm,
 			frame->rac, frame->decc, frame->azic, frame->altc,
 			frame->airmass,

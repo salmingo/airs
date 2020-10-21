@@ -18,41 +18,16 @@
 #include "Parameter.h"
 #include "DBCurl.h"
 
+// 2.78E-4 = 1″/s
+// 1"/s=2.78E-4°/s=3.215021E-9°/day
+#define ASPERDAY	3.215021E-9
+// 5"=1.388889E-3°
+#define DEG5AS		1.388889E-3
+#define MINFRAME	5	//< 有效数据最少帧数
+#define INTFRAME	10	//< 数据点间最大帧间隔
+
 namespace AstroUtil {
 //////////////////////////////////////////////////////////////////////////////
-/*!
- * @struct param_pvfind
- */
-typedef struct param_pvfind {
-	int track_mode;	// 0: 静止; 1: 恒星跟踪; 2: 快速运动
-	double changed_point;	//< 阈值: 指向变更, 量纲: 弧度. 取最大边长视场的0.2x
-	double nodata_delay;	//< 阈值: 无后续数据时延, 量纲: 秒. 取帧间隔的5x. 用于终结候选体
-
-public:
-	param_pvfind() {
-		memset(this, 0, sizeof(struct param_pvfind));
-	}
-
-	void reset() {
-		memset(this, 0, sizeof(struct param_pvfind));
-	}
-
-	/*!
-	 * @brief 由赤经轴速度计算跟踪模式
-	 * @param rate_ra  赤经轴速度, 量纲: 角秒/秒
-	 * @param rate_dec 赤纬轴速度, 量纲: 角秒/秒
-	 */
-	void set_track_rate(double rate_ra, double rate_dec) {
-		if (fabs(rate_ra - 15.) < 2. && fabs(rate_dec) < 2.) track_mode = 0;
-		else if (fabs(rate_ra) < 2. && fabs(rate_dec) < 2.)  track_mode = 1;
-		else track_mode = 2;
-	}
-
-	void set_frame_delay(double delay) {
-		nodata_delay = delay * 5.;
-	}
-} PrmPVFind;
-
 typedef struct pv_point {// 单数据点
 	// 图像帧
 	string filename;	//< 文件名
@@ -125,123 +100,113 @@ typedef boost::shared_ptr<PvFrame> PvFrmPtr;
 typedef struct pv_candidate {// 候选体
 	PvPtVec pts;	//< 已确定数据点集合
 	PvPtVec frmu;	//< 由当前帧加入的不确定数据点
-	int mode;		//< 运动规律. 0: 初始; 1: 凝视(星象不动); 2: 穿越
-	double vx, vy;	//< XY变化速度
+	double xs, ys;	//< RA/DEC变化速度
 
 public:
-	PvPtPtr first_point() {// 构成候选体的第一个数据点
-		return pts[0];
+	int sign_rate(double rate) {
+		if (fabs(rate) < ASPERDAY) return 0;
+		if (rate > 0.0) return 1;
+		return -1;
 	}
 
 	PvPtPtr last_point() {// 构成候选体的最后一个数据点
 		return pts[pts.size() - 1];
 	}
 
-	void xy_expect(double secs, double &x, double &y) {	// 由候选体已知(加)速度计算其预测位置
-		PvPtPtr pt = last_point();
-		double t = secs - pt->mjd;
-		x = pt->x + vx * t;
-		y = pt->y + vy * t;
+	void xy_expect(double mjd, double &x, double &y) {
+		PvPtPtr last = last_point();
+		double t = mjd - last->mjd;
+		x = fabs(xs) < ASPERDAY ? last->ra : cyclemod(last->ra + xs * t, 360.0);
+		y = fabs(ys) < ASPERDAY ? last->dc : last->dc + ys * t;
 	}
 
-	int track_mode(PvPtPtr pt1, PvPtPtr pt2) {
-		double dt = pt2->mjd - pt1->mjd;
-		double dr = pt2->ra - pt1->ra;
-		double dd = pt2->dc - pt1->dc;
-		double dx = pt2->x - pt1->x;
-		double dy = pt2->y - pt1->y;
-		double limit = 10.0 * AS2D * dt;
+	bool is_expect(PvPtPtr pt) {
+		PvPtPtr last = last_point();
+		double x, y, dx, dy;
+		xy_expect(pt->mjd, x, y);
+		dx = fabs(pt->ra - x);
+		dy = fabs(pt->dc - y);
+		if (dx > 180.0) dx = 360.0 - dx;
+		return (dx <= DEG5AS && dy <= DEG5AS);
+	}
 
-		if (dr < -180.0) dr += 360.0;
-		else if (dr > 180.0) dr -= 360.0;
-		if (fabs(dr) < limit && fabs(dd) < limit) return 0;
-		if (fabs(dx) <= 2.0 && fabs(dy) <= 2.0) return 1;   // 2.0: "跟踪"误差
-		return 2;
+	/*!
+	 * @brief 计算运动速度
+	 */
+	void move_speed(PvPtPtr pt1, PvPtPtr pt2, double *xrate, double *yrate) {
+		double t = pt2->mjd - pt1->mjd;
+		double yt = (pt2->dc - pt1->dc) / t;
+		double xt = pt2->ra - pt1->ra;
+		if (xt > 180.0) xt -= 360.0;
+		else if (xt < -180.0) xt += 360.0;
+		xt /= t;
+		if (xrate) *xrate = xt;
+		if (yrate) *yrate = yt;
+	}
+
+	void create(PvPtPtr pt1, PvPtPtr pt2) {
+		pts.push_back(pt1);
+		pts.push_back(pt2);
+		move_speed(pt1, pt2, &xs, &ys);
 	}
 
 	/*!
 	 * @brief 将一个数据点加入候选体
-	 * @return
-	 * -1 : 模式不匹配
-	 * -2 : 模式匹配但位置不匹配
-	 *  0 : 模式错误
-	 *  1 : 目标位置凝视模式
-	 *  2 : 目标位置变化模式
 	 */
-	int add_point(PvPtPtr pt) {
-		if (pts.size() >= 2) {
-			PvPtPtr last = last_point();
-			int mode_new = track_mode(last, pt);
-			if (mode_new != mode) return -1;
-			if (mode == 2) {// 计算期望位置与输入位置差异
-				double x, y;
-				xy_expect(pt->mjd, x, y);
-				if (fabs(x - pt->x) > 2.0 || fabs(y - pt->y) > 2.0) return -2;
-			}
-			if (pts.size() == 2) last->inc_rel(); // 为初始构建的候选体的末尾添加关联标志
-			pt->inc_rel();
-			frmu.push_back(pt);
-		}
-		else {
-			pts.push_back(pt);
-			if (pts.size() == 2) {// 创建候选体
-				PvPtPtr prev = first_point();
-				if ((mode = track_mode(prev, pt)) == 2) {
-					vx = (pt->x - prev->x) / (pt->mjd - prev->mjd);
-					vy = (pt->y - prev->y) / (pt->mjd - prev->mjd);
-				}
-			}
-		}
-		return mode;
+	void add_point(PvPtPtr pt) {
+		if (is_expect(pt)) frmu.push_back(pt);
 	}
 
-	PvPtPtr update() {	// 检查/确认来自当前帧的数据点是否加入候选体已确定数据区
+	void update() {	// 检查/确认来自当前帧的数据点是否加入候选体已确定数据区
 		PvPtPtr pt;
 		int n(frmu.size());
-		if (!n) return pt;
 		if (n == 1) pt = frmu[0];
-		else {
-			double x, y; // 期望位置
-			double dx, dy, dx2y2, dx2y2min(1E30);
+		else if (n > 1) {
+			double x, y, dx, dy, dx2y2, dx2y2min(1E30);
 
-			if (mode == 1) {
-				x = last_point()->x;
-				y = last_point()->y;
-			}
-			else {// mode == 2
-				xy_expect(frmu[0]->mjd, x, y);
-			}
-			// 查找与期望位置最接近的点
+			xy_expect(frmu[0]->mjd, x, y);
 			for (int i = 0; i < n; ++i) {
 				if (!frmu[i]->matched) {
-					dx = frmu[i]->x - x;
-					dy = frmu[i]->y - y;
+					dx = fabs(frmu[i]->ra - x);
+					dy = fabs(frmu[i]->dc - y);
+					if (dx > 180.0) dx = 360.0 - dx;
 					dx2y2 = dx * dx + dy * dy;
 					if (dx2y2 < dx2y2min) {
 						dx2y2min = dx2y2;
-						if (pt.use_count()) pt->dec_rel();
 						pt = frmu[i];
 					}
 				}
 			}
-			if (pt.use_count() && mode == 2) {
-				PvPtPtr last = last_point();
-				double dt = pt->mjd - last->mjd;
-				vx = (pt->x - last->x) / dt;
-				vy = (pt->y - last->y) / dt;
-			}
 		}
-
-		if (pt.use_count()) pts.push_back(pt);
-		frmu.clear();
-		return pt;
+		if (pt.use_count()) {
+			move_speed(last_point(), pt, &xs, &ys);
+			pt->inc_rel();
+			pts.push_back(pt);
+			frmu.clear();
+		}
 	}
 
-	void complete() {
-		PvPtPtr first = first_point();
-		PvPtPtr last  = last_point();
-		int mode_new = track_mode(first, last);
-		if (mode_new == 0) pts.clear();
+	bool complete() {
+		int i, n(pts.size());
+		if (n < MINFRAME) return false;	// 有效数据长度>=5
+
+		bool valid(true);
+		double xrate, yrate;
+		int xsgn, ysgn;
+
+		move_speed(pts[1], pts[0], &xrate, &yrate);
+		xsgn = sign_rate(xrate);
+		ysgn = sign_rate(yrate);
+		// 检测速度方向一致性
+		for (i = 2; i < n && valid; ++i) {
+			move_speed(pts[i], pts[i - 1], &xrate, &yrate);
+			valid = sign_rate(xrate) == xsgn && sign_rate(yrate) != ysgn;
+		}
+		if (!valid) {
+			for (i = 2; i < n; ++i) pts[i]->dec_rel();
+			pts.clear();
+		}
+		return valid;
 	}
 
 	virtual ~pv_candidate() {
@@ -269,7 +234,6 @@ public:
 	virtual ~AFindPV();
 
 protected:
-	PrmPVFind prmFind_;	//< 关联参数
 	/* 成员变量 */
 	Parameter *param_;	//< 配置参数
 	string gid_;		//< 组标志
@@ -314,11 +278,11 @@ protected:
 	/*!
 	 * @brief 修正周年光行差
 	 */
-	void correct_annual_aberration(FramePtr frame);
+	void correct_annual_aberration(PvPtPtr pt);
 	/*!
-	 * @brief 添加一个候选体
+	 * @brief 交叉匹配相邻帧, 判定其中的恒星
 	 */
-	void add_point(PvPtPtr pt);
+	void cross_match();
 	/*!
 	 * @brief 建立新的候选体
 	 */
@@ -384,6 +348,10 @@ public:
 	 * @brief 处理新的数据帧
 	 */
 	void NewFrame(FramePtr frame);
+	/*!
+	 * @brief 已完成处理流程
+	 */
+	bool IsOver();
 };
 //////////////////////////////////////////////////////////////////////////////
 } /* namespace AstroUtil */

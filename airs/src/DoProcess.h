@@ -56,7 +56,6 @@ protected:
 
 protected:
 	/* 成员变量 */
-	static char msgid_;
 	boost::asio::io_service *ios_;	//< io_service对象. 从内部结束程序
 	bool asdaemon_;		//< 以守护服务模式运行程序
 	Parameter param_;	//< 参数
@@ -108,6 +107,10 @@ public:
 	 * @param filepath 文件路径
 	 */
 	void ProcessImage(const string &filepath);
+	/*!
+	 * @brief 完成所有处理流程
+	 */
+	bool IsOver();
 
 public:
 	/* 回调函数 */

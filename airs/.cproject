@@ -3,9 +3,9 @@
     	
     <storageModule moduleId="org.eclipse.cdt.core.settings">
         		
-        <cconfiguration id="org.eclipse.linuxtools.cdt.autotools.core.toolChain.1566197460">
+        <cconfiguration id="org.eclipse.linuxtools.cdt.autotools.core.toolChain.1815837997">
             			
-            <storageModule buildSystemId="org.eclipse.cdt.managedbuilder.core.configurationDataProvider" id="org.eclipse.linuxtools.cdt.autotools.core.toolChain.1566197460" moduleId="org.eclipse.cdt.core.settings" name="Build (GNU)">
+            <storageModule buildSystemId="org.eclipse.cdt.managedbuilder.core.configurationDataProvider" id="org.eclipse.linuxtools.cdt.autotools.core.toolChain.1815837997" moduleId="org.eclipse.cdt.core.settings" name="Build (GNU)">
                 				
                 <externalSettings/>
                 				
@@ -29,35 +29,23 @@
             			
             <storageModule moduleId="cdtBuildSystem" version="4.0.0">
                 				
-                <configuration buildProperties="" id="org.eclipse.linuxtools.cdt.autotools.core.toolChain.1566197460" name="Build (GNU)" optionalBuildProperties="" parent="org.eclipse.cdt.build.core.emptycfg">
+                <configuration buildProperties="" id="org.eclipse.linuxtools.cdt.autotools.core.toolChain.1815837997" name="Build (GNU)" parent="org.eclipse.cdt.build.core.emptycfg">
                     					
-                    <folderInfo id="org.eclipse.linuxtools.cdt.autotools.core.toolChain.1566197460.1086082753" name="/" resourcePath="">
+                    <folderInfo id="org.eclipse.linuxtools.cdt.autotools.core.toolChain.1815837997.1874902045" name="/" resourcePath="">
                         						
-                        <toolChain id="org.eclipse.linuxtools.cdt.autotools.core.toolChain.1766428543" name="GNU Autotools Toolchain" superClass="org.eclipse.linuxtools.cdt.autotools.core.toolChain">
+                        <toolChain id="org.eclipse.linuxtools.cdt.autotools.core.toolChain.268503048" name="GNU Autotools Toolchain" superClass="org.eclipse.linuxtools.cdt.autotools.core.toolChain">
                             							
-                            <targetPlatform id="org.eclipse.linuxtools.cdt.autotools.core.toolchain.targetPlatform.1707953077" isAbstract="false" name="GNU Autotools Target Platform" superClass="org.eclipse.linuxtools.cdt.autotools.core.toolchain.targetPlatform"/>
+                            <targetPlatform id="org.eclipse.linuxtools.cdt.autotools.core.toolchain.targetPlatform.95478839" isAbstract="false" name="GNU Autotools Target Platform" superClass="org.eclipse.linuxtools.cdt.autotools.core.toolchain.targetPlatform"/>
                             							
-                            <builder id="org.eclipse.linuxtools.cdt.autotools.core.toolchain.builder.857727789" managedBuildOn="false" name="Autotools Makefile Generator.Build (GNU)" superClass="org.eclipse.linuxtools.cdt.autotools.core.toolchain.builder"/>
+                            <builder id="org.eclipse.linuxtools.cdt.autotools.core.toolchain.builder.533209573" managedBuildOn="false" name="Autotools Makefile Generator.Build (GNU)" superClass="org.eclipse.linuxtools.cdt.autotools.core.toolchain.builder"/>
                             							
-                            <tool id="org.eclipse.linuxtools.cdt.autotools.core.gnu.toolchain.tool.configure.1317901838" name="configure" superClass="org.eclipse.linuxtools.cdt.autotools.core.gnu.toolchain.tool.configure">
-                                								
-                                <option id="org.eclipse.linuxtools.cdt.autotools.core.option.configure.name.1880604974" superClass="org.eclipse.linuxtools.cdt.autotools.core.option.configure.name" value="org.eclipse.linuxtools.cdt.autotools.core.toolChain.1566197460" valueType="string"/>
-                                							
-                            </tool>
+                            <tool id="org.eclipse.linuxtools.cdt.autotools.core.gnu.toolchain.tool.configure.667290454" name="configure" superClass="org.eclipse.linuxtools.cdt.autotools.core.gnu.toolchain.tool.configure"/>
                             							
-                            <tool id="org.eclipse.linuxtools.cdt.autotools.core.toolchain.tool.autogen.531541835" name="autogen.sh" superClass="org.eclipse.linuxtools.cdt.autotools.core.toolchain.tool.autogen"/>
+                            <tool id="org.eclipse.linuxtools.cdt.autotools.core.toolchain.tool.autogen.815169330" name="autogen.sh" superClass="org.eclipse.linuxtools.cdt.autotools.core.toolchain.tool.autogen"/>
                             							
-                            <tool id="org.eclipse.linuxtools.cdt.autotools.core.toolchain.tool.gcc.605054386" name="GCC C Compiler" superClass="org.eclipse.linuxtools.cdt.autotools.core.toolchain.tool.gcc">
-                                								
-                                <inputType id="cdt.managedbuild.tool.gnu.c.compiler.input.1870946580" superClass="cdt.managedbuild.tool.gnu.c.compiler.input"/>
-                                							
-                            </tool>
+                            <tool id="org.eclipse.linuxtools.cdt.autotools.core.toolchain.tool.gcc.615773541" name="GCC C Compiler" superClass="org.eclipse.linuxtools.cdt.autotools.core.toolchain.tool.gcc"/>
                             							
-                            <tool id="org.eclipse.linuxtools.cdt.autotools.core.toolchain.tool.gpp.2109436766" name="GCC C++ Compiler" superClass="org.eclipse.linuxtools.cdt.autotools.core.toolchain.tool.gpp">
-                                								
-                                <inputType id="cdt.managedbuild.tool.gnu.cpp.compiler.input.716814012" superClass="cdt.managedbuild.tool.gnu.cpp.compiler.input"/>
-                                							
-                            </tool>
+                            <tool id="org.eclipse.linuxtools.cdt.autotools.core.toolchain.tool.gpp.182746153" name="GCC C++ Compiler" superClass="org.eclipse.linuxtools.cdt.autotools.core.toolchain.tool.gpp"/>
                             						
                         </toolChain>
                         					
@@ -93,12 +81,10 @@
     	
     <storageModule moduleId="cdtBuildSystem" version="4.0.0">
         		
-        <project id="airs.null.1338743924" name="airs"/>
+        <project id="airs.null.289590834" name="airs"/>
         	
     </storageModule>
     	
     <storageModule moduleId="org.eclipse.cdt.core.LanguageSettingsProviders"/>
-    	
-    <storageModule moduleId="org.eclipse.cdt.make.core.buildtargets"/>
     
 </cproject>

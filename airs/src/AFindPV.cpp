@@ -51,6 +51,10 @@ void AFindPV::NewFrame(FramePtr frame) {
 	cv_newfrm_.notify_one();
 }
 
+bool AFindPV::IsOver() {
+	return (!(frmque_.size() || frmprev_.unique() || frmnow_.unique()));
+}
+
 void AFindPV::new_sequence() {
 	last_fno_ = INT_MAX;
 }
@@ -61,12 +65,7 @@ void AFindPV::end_sequence() {
 		frmprev_.reset();
 		frmnow_.reset();
 		cans_.clear();
-		prmFind_.reset();
 	}
-}
-
-void AFindPV::add_point(PvPtPtr pt) {
-	frmnow_->pts.push_back(pt);
 }
 
 void AFindPV::new_frame(FramePtr frame) {
@@ -78,18 +77,15 @@ void AFindPV::new_frame(FramePtr frame) {
 	frmnow_->rac      = frame->rac;
 	frmnow_->decc     = frame->decc;
 
-	if (!frmprev_.unique()) {// prev指向空, 即仅now有效, 此时计算视场
-
-	}
-	else if (prmFind_.nodata_delay < 1E-6) {
-		double delay = frmnow_->secofday - frmprev_->secofday;
-		double dra = frmnow_->rac - frmprev_->rac;
-		double ddc = frmnow_->decc - frmprev_->decc;
-		if (delay < 0.) delay += 86400.;
-		dra = dra * 3600. / delay;
-		ddc = ddc * 3600. / delay;
-		prmFind_.set_frame_delay(delay);
-		prmFind_.set_track_rate(dra, ddc);
+	NFObjVec &objs = frame->nfobjs;
+	PvPtVec &pts = frmnow_->pts;
+	int n = objs.size();
+	for (int i = 0; i < n; ++i) {
+		PvPtPtr pt = boost::make_shared<PvPt>();
+		*pt = *frame;
+		*pt = *(objs[i]);
+		pt->id = objs[i]->id;
+		pts.push_back(pt);
 	}
 }
 
@@ -101,85 +97,83 @@ void AFindPV::end_frame() {
 	}
 }
 
-void AFindPV::correct_annual_aberration(FramePtr frame) {
-	AnnualAberration abb;
-	double mjd = frame->mjd;
-	double ra, dec, d_ra, d_dec;
-	NFObjVec &objs = frame->nfobjs;
-	int n = objs.size();
-	for (int i = 0; i < n; ++i) {
-		if (!objs[i]->matched) {
-			/* 改正: 周年光行差 */
-			ra = objs[i]->ra_fit * D2R;
-			dec = objs[i]->dec_fit * D2R;
-			abb.GetAnnualAberration(mjd, ra, dec, d_ra, d_dec);
-			ra  = cyclemod(ra + d_ra, A2PI) * R2D;
-			dec = (dec + d_dec) * R2D;
-			if (dec > 90.0) {
-				dec = 180.0 - dec;
-				ra  = cyclemod(ra + 180.0, 360.0);
-			}
-			else if (dec < -90) {
-				dec = -180 - dec;
-				ra  = cyclemod(ra + 180.0, 360.0);
-			}
-			objs[i]->ra_fit = ra;
-			objs[i]->dec_fit = dec;
+/*
+ * 从相邻帧中识别未标记的恒星
+ */
+void AFindPV::cross_match() {
+	if (!frmprev_.unique()) return;
+	PvPtVec &prev = frmprev_->pts;
+	PvPtVec &now  = frmnow_->pts;
+	double dx, dy;
 
-			PvPtPtr pt = boost::make_shared<PvPt>();
-			*pt = *frame;
-			*pt = *(objs[i]);
-			pt->id = objs[i]->id;
-			add_point(pt);
+	for (PvPtVec::iterator it1 = prev.begin(); it1 != prev.end(); ++it1) {
+		if ((*it1)->matched) continue;
+		for (PvPtVec::iterator it2 = now.begin(); it2 != now.end(); ++it2) {
+			if ((*it2)->matched) continue;
+
+			dy = fabs((*it2)->dc - (*it1)->dc);
+			dx = fabs((*it2)->ra - (*it1)->ra);
+			if (dx > 180.0) dx = 360.0 - dx;
+			if (dx <= DEG5AS && dy <= DEG5AS) {
+				(*it1)->matched = 2;
+				(*it2)->matched = 2;
+#ifdef NDEBUG
+				printf ("matched = 2. %s %6.1f %6.1f %8.4f %8.4f, %s %6.1f %6.1f %8.4f %8.4f\n",
+						(*it1)->filename.c_str(), (*it1)->x, (*it1)->y, (*it1)->ra, (*it1)->dc,
+						(*it2)->filename.c_str(), (*it2)->x, (*it2)->y, (*it2)->ra, (*it2)->dc);
+#endif
+			}
 		}
 	}
 }
 
+void AFindPV::correct_annual_aberration(PvPtPtr pt) {
+	AnnualAberration abb;
+	double mjd = pt->mjd;
+	double ra, dec, d_ra, d_dec;
+
+	/* 改正: 周年光行差 */
+	ra = pt->ra * D2R;
+	dec = pt->dc * D2R;
+	abb.GetAnnualAberration(mjd, ra, dec, d_ra, d_dec);
+	ra  = cyclemod(ra + d_ra, A2PI) * R2D;
+	dec = (dec + d_dec) * R2D;
+	if (dec > 90.0) {
+		dec = 180.0 - dec;
+		ra  = cyclemod(ra + 180.0, 360.0);
+	}
+	else if (dec < -90) {
+		dec = -180 - dec;
+		ra  = cyclemod(ra + 180.0, 360.0);
+	}
+	pt->ra = ra;
+	pt->dc = dec;
+}
+
 void AFindPV::create_candidates() {
-	if (!frmprev_.unique()) return;
+	if (!frmprev_.use_count()) return;
 	PvPtVec &prev = frmprev_->pts;
 	PvPtVec &now  = frmnow_->pts;
 	if (!(prev.size() && now.size())) return;
 
 	// 使用相邻帧创建候选体
 	PvPtVec::iterator itprev, itnow;
-	int mode;
-	double x1, x2, y1, y2, dx, dy;
+	double x1, x2, y1, y2;
 	for (itprev = prev.begin(); itprev != prev.end() && now.size(); ++itprev) {
-		if ((*itprev)->related) continue;
-		mode = -1;
+		if ((*itprev)->matched || (*itprev)->related) continue;
 		x1 = (*itprev)->x;
 		y1 = (*itprev)->y;
-		for (itnow = now.begin(); mode && itnow != now.end(); ) {
-			if ((*itnow)->related) {
-				++itnow;
-				continue;
-			}
-			x2 = (*itnow)->x;
-			y2 = (*itnow)->y;
-			dx = x2 - x1;
-			dy = y2 - y1;
-			if (fabs(x2 - x1) > 100 || fabs(y2 - y1) > 100) ++itnow;
-			else {
-				PvCanPtr can = boost::make_shared<PvCan>();
-				can->add_point(*itprev);
-				mode = can->add_point(*itnow);
-				if (mode > 0) {
+		for (itnow = now.begin(); itnow != now.end(); ++itnow) {
+			if (!((*itnow)->matched || (*itnow)->related)) {
+				x2 = (*itnow)->x;
+				y2 = (*itnow)->y;
+				if (fabs(x2 - x1) <= 100 && fabs(y2 - y1) <= 100) {
+					PvCanPtr can = boost::make_shared<PvCan>();
+					can->create(*itprev, *itnow);
 					cans_.push_back(can);
-					++itnow;
-				}
-				else if (mode == 0) {
-					(*itnow)->matched = 1;
-					itnow = now.erase(itnow);
 				}
 			}
 		}
-	}
-
-	// 回归检查新创建候选体的有效性
-	for (PvCanVec::iterator it = cans_.begin(); it != cans_.end(); ) {
-		if ((*it)->pts.size() > 2 || !(*it)->last_point()->matched) ++it;
-		else it = cans_.erase(it);
 	}
 
 #ifdef NDEBUG
@@ -194,7 +188,7 @@ void AFindPV::append_candidates() {
 
 	for (itcan = cans_.begin(); itcan != cans_.end(); ++itcan) {
 		for (itpt = pts.begin(); itpt != pts.end(); ++itpt) {
-			(*itcan)->add_point(*itpt);
+			if (!(*itpt)->matched) (*itcan)->add_point(*itpt);
 		}
 		(*itcan)->update();
 	}
@@ -202,10 +196,9 @@ void AFindPV::append_candidates() {
 
 void AFindPV::recheck_candidates() {
 	for (PvCanVec::iterator it = cans_.begin(); it != cans_.end();) {
-		if ((last_fno_ - (*it)->last_point()->fno) <= 5) ++it;
+		if ((last_fno_ - (*it)->last_point()->fno) <= INTFRAME) ++it;
 		else { // 移出候选体集合
-			(*it)->complete();
-			if ((*it)->pts.size() >= 5) candidate2object(*it); // 转换为目标
+			if ((*it)->complete()) candidate2object(*it); // 转换为目标
 			it = cans_.erase(it);
 		}
 	}
@@ -215,19 +208,12 @@ void AFindPV::recheck_candidates() {
 }
 
 void AFindPV::complete_candidates() {
-	int n(0);
 	for (PvCanVec::iterator it = cans_.begin(); it != cans_.end();) {
-		(*it)->complete();
-		if ((*it)->pts.size() >= 5) {
-			++n;
-			++it;
-		}
+		if ((*it)->complete()) ++it;
 		else it = cans_.erase(it);
 	}
-	if (n < 100) {
-		for (PvCanVec::iterator it = cans_.begin(); it != cans_.end(); ++it) {
-			candidate2object(*it);
-		}
+	for (PvCanVec::iterator it = cans_.begin(); it != cans_.end(); ++it) {
+		candidate2object(*it);
 	}
 }
 
@@ -235,42 +221,30 @@ void AFindPV::candidate2object(PvCanPtr can) {
 	PvPtVec & pts = can->pts;
 	PvObjPtr obj = boost::make_shared<PvObj>();
 	PvPtVec &npts = obj->pts;
-	/*---------- 过滤噪点和恒星: 2020-06 ----------*/
-	/*
-	 * - XY位置变化小于阈值: 1pix. 此判据认为在无闭环前提下, 跟踪精度不会好于1pix
-	 * - 赤经运动距离与恒星速度的偏差小于阈值, 且赤纬偏差小于阈值, 阈值暂定为5角秒. 适用于静止模式下错误识别的恒星
-	 *
-	 * 过滤算法缺陷: 不能剔除跟踪模式下的热噪声
-	 * - 暂: 适当提高信噪比, 以提高置信度
-	 */
+	/*---------- 过滤热点: 2020-06 ----------*/
 	bool noise(false);
 	int n = pts.size();
-	double x, y, dx, dy;
+	double x, y, xsum(0.0), xsq(0.0), ysum(0.0), ysq(0.0), xsig, ysig;
 	double xmin(1E30), xmax(0.0), ymin(1E30), ymax(0.0);
-	double dr = fabs(pts[n-1]->ra - pts[0]->ra);
-	double dd = fabs(pts[n-1]->dc - pts[0]->dc) * D2AS;
-	double dt = (pts[n-1]->mjd - pts[0]->mjd) * DAYSEC * 15.0; // 15.04108: 地球自转速度
 
-	if (fabs(dr) > 180.0) dr = 360.0 - dr;
-	dr *= D2AS;
-	x = pts[0]->x, y = pts[0]->y;
-	for (int i = 1; i < n; ++i) {
-		dx = fabs(pts[i]->x - x);
-		dy = fabs(pts[i]->y - y);
+	for (int i = 0; i < n; ++i) {
 		x = pts[i]->x;
 		y = pts[i]->y;
+		xsum +=x;
+		ysum +=y;
+		xsq += (x * x);
+		ysq += (y * y);
 
-		if (xmin > dx) xmin = dx;
-		if (xmax < dx) xmax = dx;
-		if (ymin > dy) ymin = dy;
-		if (ymax < dy) ymax = dy;
+		if (xmin > x) xmin = x;
+		if (xmax < x) xmax = x;
+		if (ymin > y) ymin = y;
+		if (ymax < y) ymax = y;
 	}
-	if ((xmax - xmin) <= 3.0 && (ymax - ymin) <= 3.0) {
-		dx = fabs(pts[n - 1]->x - pts[0]->x);
-		dy = fabs(pts[n - 1]->y - pts[0]->y);
-		if (dx <= 3.0 && dy <= 3.0) noise = true;
-	}
-	else if (dd < 10.0 && dr < dt) noise = true;
+	xsig = (xsq - xsum * xsum / n) / n;
+	ysig = (ysq - ysum * ysum / n) / n;
+	xsig = xsig >= 0.0 ? sqrt(xsig) : 0.0;
+	ysig = ysig >= 0.0 ? sqrt(ysig) : 0.0;
+	noise = (xmax - xmin) <= 2.0 && (ymax - ymin) <= 2.0 && xsig < 1.0 && ysig < 1.0;
 	/*------------------------------------------------------------*/
 	if (!noise) {
 		ptime tmmid;
@@ -278,8 +252,11 @@ void AFindPV::candidate2object(PvCanPtr can) {
 		double lines(4096.0);
 		double tline = tread / lines;
 		for (PvPtVec::iterator it = pts.begin(); it != pts.end(); ++it) {
+			// 修正rolling shutter在不同行的时间偏差
 			tmmid = from_iso_extended_string((*it)->tmmid) + millisec(int(((*it)->y * tline)));
 			(*it)->tmmid = to_iso_extended_string(tmmid);
+			// 修正周年光行差
+			correct_annual_aberration(*it);
 			npts.push_back(*it);
 		}
 		upload_orbit(obj);
@@ -372,6 +349,7 @@ void AFindPV::upload_orbit(PvObjPtr obj) {
 	ptime::time_duration_type tdt;
 	int iy, im, id, hh, mm;
 	double ss;
+	int related(0);
 
 	for (i = 0; i < npts; ++i) {
 		pt = pts[i];
@@ -384,6 +362,7 @@ void AFindPV::upload_orbit(PvObjPtr obj) {
 		hh = tdt.hours();
 		mm = tdt.minutes();
 		ss = tdt.seconds() + tdt.fractional_seconds() * 1E-6;
+		if (pt->related > 1) ++related;
 
 		fprintf(fpdst, "%s %d %02d %02d %02d %02d %06.3f %5d %9.5f %9.5f ", pt->filename.c_str(),
 				iy, im, id, hh, mm, ss, pt->fno, pt->ra, pt->dc);
@@ -394,6 +373,8 @@ void AFindPV::upload_orbit(PvObjPtr obj) {
 		fprintf(fpdst, "%7.2f %7.2f\r\n", pt->x, pt->y);
 	}
 	fclose(fpdst);
+
+	if (related) _gLog->Write("%s had multi-related points\n", objpath.c_str());
 }
 
 void AFindPV::utc_convert_1(const string &utc1, string &utc2) {
@@ -524,7 +505,7 @@ void AFindPV::save_gtw_orbit(PvObjPtr obj) {
 void AFindPV::thread_newframe() {
 	boost::mutex mtx;
 	mutex_lock lck(mtx);
-	boost::chrono::minutes period(5);
+	boost::chrono::minutes period(1);
 
 	while (1) {
 		if (frmque_.empty()) // 当无待处理图像时, 延时等待
@@ -550,7 +531,7 @@ void AFindPV::thread_newframe() {
 			}
 			upload_ot(frame);
 			new_frame(frame);
-			correct_annual_aberration(frame);
+			cross_match();
 			end_frame();
 		}
 	}

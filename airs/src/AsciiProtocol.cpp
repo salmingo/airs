@@ -446,7 +446,7 @@ apbase AsciiProtocol::Resolve(const char *rcvd) {
 	ascii_proto_base basis;
 
 #ifdef NDEBUG
-	_gLog.Write("ascii received [%s]", rcvd);
+	_gLog->Write("ascii received [%s]", rcvd);
 #endif
 
 	// 提取协议类型
