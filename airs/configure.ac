@@ -53,7 +53,7 @@ esac],
 AM_CONDITIONAL(DEBUG, test x"$debug" = x"true")
 
 AC_CHECK_HEADERS([fcntl.h syslog.h unistd.h])
-AC_CHECK_FUNCS([ftruncate mkdir memset pow, sqrt strstr bzero strcasecmp strpbrk])
+AC_CHECK_FUNCS([ftruncate mkdir memset pow sqrt strstr bzero strcasecmp strpbrk])
 AC_CHECK_HEADER_STDBOOL
 AC_FUNC_FORK
 AC_FUNC_MALLOC

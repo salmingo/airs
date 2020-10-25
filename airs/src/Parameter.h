@@ -6,6 +6,7 @@
 #define PARAMETER_H_
 
 #include <string>
+#include <vector>
 #include <boost/property_tree/xml_parser.hpp>
 #include <boost/property_tree/ptree.hpp>
 #include <boost/algorithm/string.hpp>
@@ -14,6 +15,19 @@
 #include <boost/smart_ptr.hpp>
 
 using std::string;
+
+struct CameraBadcol {
+	string gid;
+	string uid;
+	string cid;
+	std::vector<int> cols;
+
+public:
+	bool is_matched(const string& _gid, const string& _uid, const string& _cid) {
+		return (gid == _gid && uid == _uid && cid == _cid);
+	}
+};
+typedef std::vector<CameraBadcol> CamBadcolVec;
 
 struct Parameter {// 软件配置参数
 	// 测站位置, 用于计算高度角及大气质量
@@ -51,6 +65,12 @@ struct Parameter {// 软件配置参数
 	bool fsEnable;		//< 与服务器连接启用标志
 	string fsIPv4;		//< 服务器IPv4地址
 	int fsPort;			//< 服务器服务端口
+	// 坏像列
+	CamBadcolVec badColSet;	//< 坏像列
+
+protected:
+	string filepath;
+	bool dirty;
 
 public:
 	/*!
@@ -104,9 +124,13 @@ public:
 		pt6.add("<xmlattr>.Enable",    false);
 		pt6.add("Host.<xmlattr>.IPv4",  "127.0.0.1");
 		pt6.add("Host.<xmlattr>.Port",  4021);
+		// 坏像列
+		ptree& pt7 = pt.add("BadColumn", "");
 
 		boost::property_tree::xml_writer_settings<std::string> settings(' ', 4);
 		write_xml(filepath, pt, std::locale(), settings);
+
+		dirty = false;
 	}
 
 	/*!
@@ -169,9 +193,50 @@ public:
 
 			if (sizeNear < 128) sizeNear = 128;
 			else if (sizeNear > 1024) sizeNear = 1024;
+
+			this->filepath = filepath;
+			dirty = false;
 		}
 		catch(boost::property_tree::xml_parser_error &ex) {
 			InitFile(filepath);
+		}
+	}
+
+	CameraBadcol* GetBadcol(const string& gid, const string& uid, const string& cid) {
+		CamBadcolVec::iterator it;
+		for (it = badColSet.begin(); it != badColSet.end(); ++it) {
+			if (it->is_matched(gid, uid, cid)) break;
+		}
+		return it == badColSet.end() ? NULL : &(*it);
+	}
+
+	void AddBadcol(const string& gid, const string& uid, const string& cid, int col) {
+		CameraBadcol* ptr = GetBadcol(gid, uid, cid);
+		if (!ptr) {
+			CameraBadcol badcol;
+			badcol.gid = gid;
+			badcol.uid = uid;
+			badcol.cid = cid;
+			badColSet.push_back(badcol);
+			ptr = &badcol;
+		}
+		ptr->cols.push_back(col);
+		dirty = true;
+	}
+
+	virtual ~Parameter() {
+		if (!dirty || filepath.empty()) return ;
+		// 保存坏像列
+		try {
+			using boost::property_tree::ptree;
+
+			ptree pt;
+			read_xml(filepath, pt, boost::property_tree::xml_parser::trim_whitespace);
+
+			boost::property_tree::xml_writer_settings<std::string> settings(' ', 4);
+			write_xml(filepath, pt, std::locale(), settings);
+		}
+		catch(boost::property_tree::xml_parser_error &ex) {
 		}
 	}
 };

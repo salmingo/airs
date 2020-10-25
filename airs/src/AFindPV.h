@@ -9,6 +9,7 @@
 
 #include <boost/smart_ptr.hpp>
 #include <boost/thread.hpp>
+#include <boost/signals2.hpp>
 #include <string.h>
 #include <vector>
 #include <string>
@@ -19,8 +20,8 @@
 #include "DBCurl.h"
 
 // 2.78E-4 = 1″/s
-// 1"/s=2.78E-4°/s=3.215021E-9°/day
-#define ASPERDAY	3.215021E-9
+// 1"/s=24°/day
+#define ASPERDAY	24
 // 5"=1.388889E-3°
 #define DEG5AS		1.388889E-3
 #define MINFRAME	5	//< 有效数据最少帧数
@@ -101,6 +102,7 @@ typedef struct pv_candidate {// 候选体
 	PvPtVec pts;	//< 已确定数据点集合
 	PvPtVec frmu;	//< 由当前帧加入的不确定数据点
 	double xs, ys;	//< RA/DEC变化速度
+	int badcol;		//< 坏列标记. 0: 非; 1: 疑似; 2: 确认
 
 public:
 	int sign_rate(double rate) {
@@ -148,6 +150,7 @@ public:
 		pts.push_back(pt1);
 		pts.push_back(pt2);
 		move_speed(pt1, pt2, &xs, &ys);
+		badcol = 0;
 	}
 
 	/*!
@@ -194,13 +197,13 @@ public:
 		double xrate, yrate;
 		int xsgn, ysgn;
 
-		move_speed(pts[1], pts[0], &xrate, &yrate);
+		move_speed(pts[0], pts[1], &xrate, &yrate);
 		xsgn = sign_rate(xrate);
 		ysgn = sign_rate(yrate);
 		// 检测速度方向一致性
 		for (i = 2; i < n && valid; ++i) {
-			move_speed(pts[i], pts[i - 1], &xrate, &yrate);
-			valid = sign_rate(xrate) == xsgn && sign_rate(yrate) != ysgn;
+			move_speed(pts[i - 1], pts[i], &xrate, &yrate);
+			valid = sign_rate(xrate) == xsgn && sign_rate(yrate) == ysgn;
 		}
 		if (!valid) {
 			for (i = 2; i < n; ++i) pts[i]->dec_rel();
@@ -222,7 +225,27 @@ typedef struct pv_object {	// PV目标
 typedef boost::shared_ptr<PvObj> PvObjPtr;
 typedef std::vector<PvObjPtr> PvObjVec;
 
+struct uncertain_badcol {
+	int col;	//< 列编号
+	int hit;	//< 命中率
+
+public:
+	uncertain_badcol() {
+		col = hit = 0;
+	}
+
+	int test(int c) {
+		if (fabs(col - c) <= 2) ++hit;
+		return hit;
+	}
+};
+typedef std::vector<uncertain_badcol> UncBadcolVec;
+
 class AFindPV {
+public:
+	typedef boost::signals2::signal<void (const string&, const string&, const string&, int)> CBFMarkCol;	//< 回调函数, 标记坏列
+	typedef CBFMarkCol::slot_type CBFMarkColSlot;
+
 protected:
 	/* 数据类型 */
 	typedef boost::shared_ptr<boost::thread> threadptr;
@@ -250,6 +273,8 @@ protected:
 	string dirname_;	//< 输出文件的目录名
 	string dirgtw_;		//< GTW格式输出文件的目录名
 	string utcdate_;	//< UTC日期
+	UncBadcolVec uncbadcol_;	//< 不确定的坏列
+	CBFMarkCol cbfMakrCol_;		//< 回调函数, 标记坏列
 
 	boost::mutex mtx_frmque_;	//< 互斥锁: 图像队列
 	FrameQue frmque_;			//< 队列: 待处理图像
@@ -305,6 +330,7 @@ protected:
 	 * @brief 将一个候选体转换为目标
 	 */
 	void candidate2object(PvCanPtr can);
+	bool is_badcol(int col);
 	/*!
 	 * @brief 维护输出目录
 	 */
@@ -344,6 +370,7 @@ protected:
 public:
 	void SetIDs(const string& gid, const string& uid, const string& cid);
 	bool IsMatched(const string& gid, const string& uid, const string& cid);
+	void RegisterMarkCol(const CBFMarkColSlot &slot);
 	/*!
 	 * @brief 处理新的数据帧
 	 */

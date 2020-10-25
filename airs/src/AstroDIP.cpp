@@ -21,9 +21,9 @@ using namespace boost::posix_time;
 
 //////////////////////////////////////////////////////////////////////////////
 /* 临时以固定数组管理坏像素 */
-//int bad_col[] = {
-//	1380
-//};
+int bad_col[] = {
+	1380
+};
 //
 //int bad_pixel[][2] = {
 //	{4090,   79},
@@ -56,13 +56,13 @@ using namespace boost::posix_time;
  * bad_pixel[][]先按[][1]排序, 若[1]相同, 则按[0]排序
  */
 bool is_badpixel(double x, double y) {
-//	int x0 = int(x + 0.5);
+	int x0 = int(x + 0.5);
 //	int y0 = int(y + 0.5);
-//	int n = sizeof(bad_col) / sizeof(int);
-//	int low, high, now;
-//	for (now = 0; now < n; ++now) {
-//		if (abs(bad_col[now] - x0) < 2) return true;
-//	}
+	int n = sizeof(bad_col) / sizeof(int);
+	int low, high, now;
+	for (now = 0; now < n; ++now) {
+		if (abs(bad_col[now] - x0) < 2) return true;
+	}
 //
 //	n = sizeof(bad_pixel) / sizeof(int) / 2;
 //	low = 0;
@@ -173,7 +173,7 @@ void AstroDIP::load_catalog() {
 			}
 			features = body->features;
 			if (pos == NDX_MAX
-//					&& !is_badpixel(features[NDX_X], features[NDX_Y])
+					&& !is_badpixel(features[NDX_X], features[NDX_Y])
 					&& features[NDX_FLUX] > 1.0
 					&& features[NDX_FWHM] > 0.5
 					&& features[NDX_BACK] < 50000.0) {

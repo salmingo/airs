@@ -168,8 +168,8 @@ int main(int argc, char **argv) {
 			while (!doProcess->IsOver()) boost::this_thread::sleep_for(boost::chrono::seconds(30));
 			doProcess->StopService();
 			--_nProcess;
-			while(_nProcess) boost::this_thread::sleep_for(boost::chrono::seconds(30));
 		}
+		while(_nProcess) boost::this_thread::sleep_for(boost::chrono::seconds(30));
 	}
 
 	return 0;

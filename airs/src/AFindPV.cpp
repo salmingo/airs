@@ -45,6 +45,10 @@ bool AFindPV::IsMatched(const string& gid, const string& uid, const string& cid)
 	return (gid_ == gid && uid_ == uid && cid_ == cid);
 }
 
+void AFindPV::RegisterMarkCol(const CBFMarkColSlot &slot) {
+	cbfMakrCol_.connect(slot);
+}
+
 void AFindPV::NewFrame(FramePtr frame) {
 	mutex_lock lck(mtx_frmque_);
 	frmque_.push_back(frame);
@@ -65,6 +69,7 @@ void AFindPV::end_sequence() {
 		frmprev_.reset();
 		frmnow_.reset();
 		cans_.clear();
+		uncbadcol_.clear();
 	}
 }
 
@@ -105,9 +110,10 @@ void AFindPV::cross_match() {
 	PvPtVec &prev = frmprev_->pts;
 	PvPtVec &now  = frmnow_->pts;
 	double dx, dy;
-
+	int n0(0), n2(0);
 	for (PvPtVec::iterator it1 = prev.begin(); it1 != prev.end(); ++it1) {
 		if ((*it1)->matched) continue;
+		++n0;
 		for (PvPtVec::iterator it2 = now.begin(); it2 != now.end(); ++it2) {
 			if ((*it2)->matched) continue;
 
@@ -117,6 +123,7 @@ void AFindPV::cross_match() {
 			if (dx <= DEG5AS && dy <= DEG5AS) {
 				(*it1)->matched = 2;
 				(*it2)->matched = 2;
+				++n2;
 #ifdef NDEBUG
 				printf ("matched = 2. %s %6.1f %6.1f %8.4f %8.4f, %s %6.1f %6.1f %8.4f %8.4f\n",
 						(*it1)->filename.c_str(), (*it1)->x, (*it1)->y, (*it1)->ra, (*it1)->dc,
@@ -124,6 +131,10 @@ void AFindPV::cross_match() {
 #endif
 			}
 		}
+	}
+	if (n0) {
+		_gLog->Write("Points<%s>: non-matched %d of %d", prev[0]->filename.c_str(),
+				n0 - n2, prev.size());
 	}
 }
 
@@ -217,6 +228,13 @@ void AFindPV::complete_candidates() {
 	}
 }
 
+bool AFindPV::is_badcol(int col) {
+	for (UncBadcolVec::iterator it = uncbadcol_.begin(); it != uncbadcol_.end(); ++it) {
+		if (it->test(col) > 3) return true;
+	}
+	return false;
+}
+
 void AFindPV::candidate2object(PvCanPtr can) {
 	PvPtVec & pts = can->pts;
 	PvObjPtr obj = boost::make_shared<PvObj>();
@@ -244,7 +262,15 @@ void AFindPV::candidate2object(PvCanPtr can) {
 	ysig = (ysq - ysum * ysum / n) / n;
 	xsig = xsig >= 0.0 ? sqrt(xsig) : 0.0;
 	ysig = ysig >= 0.0 ? sqrt(ysig) : 0.0;
-	noise = (xmax - xmin) <= 2.0 && (ymax - ymin) <= 2.0 && xsig < 1.0 && ysig < 1.0;
+	/* 识别热点和坏列 */
+	if ((xmax - xmin) <= 2.0 && xsig < 1.0) {
+		if (!(noise = (ymax - ymin) <= 2.0 && ysig < 1.0)) {
+			noise = is_badcol(int((xmax + xmin) * 0.5));
+			if (noise) {
+
+			}
+		}
+	}
 	/*------------------------------------------------------------*/
 	if (!noise) {
 		ptime tmmid;

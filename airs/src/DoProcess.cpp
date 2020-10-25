@@ -67,7 +67,8 @@ void DoProcess::ProcessImage(const string &filepath) {
 }
 
 bool DoProcess::IsOver() {
-	if (queReduct_.size()) return false;
+	if (queReduct_.size() || queAstro_.size() || queMatch_.size() || quePhoto_.size())
+		return false;
 	for (FindPVVec::iterator it = finders_.begin(); it != finders_.end(); ++it) {
 		if (!(*it)->IsOver()) return false;
 	}
@@ -235,12 +236,12 @@ bool DoProcess::check_image(FramePtr frame) {
 		frame->secofday = tmmid.time_of_day().total_milliseconds() / 86400000.0;
 		frame->mjd      = tmmid.date().modjulian_day() + frame->secofday;
 
-		if (frame->gid.empty() || frame->uid.empty() || frame->cid.empty()) {
-			_gLog->Write(LOG_FAULT, NULL, "File[%s] doesn't give right IDs[%s:%s:%s]",
-					frame->filename.c_str(),
-					frame->gid.c_str(), frame->uid.c_str(), frame->cid.c_str());
-			status = -1;
-		}
+//		if (frame->gid.empty() || frame->uid.empty() || frame->cid.empty()) {
+//			_gLog->Write(LOG_FAULT, NULL, "File[%s] doesn't give right IDs[%s:%s:%s]",
+//					frame->filename.c_str(),
+//					frame->gid.c_str(), frame->uid.c_str(), frame->cid.c_str());
+//			status = -1;
+//		}
 	}
 	return (status == 0);
 }
@@ -257,11 +258,19 @@ DoProcess::FindPVPtr DoProcess::get_finder(FramePtr frame) {
 	if (it != itend) finder = *it;
 	else {
 		finder = boost::make_shared<AFindPV>(&param_);
+		const AFindPV::CBFMarkColSlot &slot = boost::bind(&DoProcess::mark_badcol, this, _1, _2, _3, _4);
+		finder->RegisterMarkCol(slot);
 		finder->SetIDs(gid, uid, cid);
 		finders_.push_back(finder);
 	}
 
 	return finder;
+}
+
+void DoProcess::mark_badcol(const string& gid, const string& uid, const string& cid, int col) {
+	// 通知AstroDIP
+
+	// 保存到xml文件
 }
 
 void DoProcess::thread_reduct() {
