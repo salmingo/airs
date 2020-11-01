@@ -105,8 +105,9 @@ CONFIG_CLEAN_VPATH_FILES =
 am__installdirs = "$(DESTDIR)$(bindir)"
 PROGRAMS = $(bin_PROGRAMS)
 am_airs1_OBJECTS = Parameter.$(OBJEXT) AMath.$(OBJEXT) \
-	ADIReduct.$(OBJEXT) ADIProcess.$(OBJEXT) AStarMatch.$(OBJEXT) \
-	AFindPV.$(OBJEXT) airs.$(OBJEXT)
+	ADIReduct.$(OBJEXT) ADIProcess.$(OBJEXT) ACatalog.$(OBJEXT) \
+	ACatTycho2.$(OBJEXT) AStarMatch.$(OBJEXT) AFindPV.$(OBJEXT) \
+	airs.$(OBJEXT)
 airs1_OBJECTS = $(am_airs1_OBJECTS)
 am__DEPENDENCIES_1 =
 airs1_DEPENDENCIES = $(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
@@ -128,7 +129,8 @@ am__v_at_1 =
 DEFAULT_INCLUDES = -I.@am__isrc@ -I$(top_builddir)
 depcomp = $(SHELL) $(top_srcdir)/depcomp
 am__maybe_remake_depfiles = depfiles
-am__depfiles_remade = ./$(DEPDIR)/ADIProcess.Po \
+am__depfiles_remade = ./$(DEPDIR)/ACatTycho2.Po \
+	./$(DEPDIR)/ACatalog.Po ./$(DEPDIR)/ADIProcess.Po \
 	./$(DEPDIR)/ADIReduct.Po ./$(DEPDIR)/AFindPV.Po \
 	./$(DEPDIR)/AMath.Po ./$(DEPDIR)/AStarMatch.Po \
 	./$(DEPDIR)/Parameter.Po ./$(DEPDIR)/airs.Po
@@ -289,8 +291,8 @@ target_vendor = @target_vendor@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-airs1_SOURCES = Parameter.cpp AMath.cpp ADIReduct.cpp ADIProcess.cpp ProjectTNX.hpp AStarMatch.cpp \
-              AFindPV.cpp airs.cpp
+airs1_SOURCES = Parameter.cpp AMath.cpp ADIReduct.cpp ADIProcess.cpp ACatalog.cpp ACatTycho2.cpp \
+              ProjectTNX.hpp AStarMatch.cpp AFindPV.cpp airs.cpp
 
 @DEBUG_FALSE@AM_CFLAGS = -O3 -Wall
 @DEBUG_TRUE@AM_CFLAGS = -g3 -O0 -Wall -DNDEBUG
@@ -386,6 +388,8 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ACatTycho2.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ACatalog.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ADIProcess.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ADIReduct.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/AFindPV.Po@am__quote@ # am--include-marker
@@ -541,7 +545,9 @@ clean: clean-am
 clean-am: clean-binPROGRAMS clean-generic mostlyclean-am
 
 distclean: distclean-am
-		-rm -f ./$(DEPDIR)/ADIProcess.Po
+		-rm -f ./$(DEPDIR)/ACatTycho2.Po
+	-rm -f ./$(DEPDIR)/ACatalog.Po
+	-rm -f ./$(DEPDIR)/ADIProcess.Po
 	-rm -f ./$(DEPDIR)/ADIReduct.Po
 	-rm -f ./$(DEPDIR)/AFindPV.Po
 	-rm -f ./$(DEPDIR)/AMath.Po
@@ -593,7 +599,9 @@ install-ps-am:
 installcheck-am:
 
 maintainer-clean: maintainer-clean-am
-		-rm -f ./$(DEPDIR)/ADIProcess.Po
+		-rm -f ./$(DEPDIR)/ACatTycho2.Po
+	-rm -f ./$(DEPDIR)/ACatalog.Po
+	-rm -f ./$(DEPDIR)/ADIProcess.Po
 	-rm -f ./$(DEPDIR)/ADIReduct.Po
 	-rm -f ./$(DEPDIR)/AFindPV.Po
 	-rm -f ./$(DEPDIR)/AMath.Po

@@ -25,13 +25,13 @@ AC_CHECK_LIB([pthread], [main])
 AC_CHECK_LIB([rt], [main])
 
 # Checks for header files.
-AC_CHECK_HEADERS([string.h strings.h unistd.h])
+AC_CHECK_HEADERS([stdlib.h string.h unistd.h])
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_CHECK_HEADER_STDBOOL
 
 # Checks for library functions.
-AC_CHECK_FUNCS([bzero memset sqrt strstr])
+AC_CHECK_FUNCS([memset sqrt strstr])
 
 AC_CONFIG_FILES([Makefile
                  src/Makefile])

@@ -183,8 +183,8 @@ void AstroDIP::load_catalog() {
 				 * - 圆形度小于0.2
 				 * - 在中心区域内
 				 */
-				if (features[NDX_ELLIP] < 0.1 && features[NDX_X] >= x1 && features[NDX_X] < x2
-						&& features[NDX_Y] >= y1 && features[NDX_Y] < y2)
+//				if (features[NDX_ELLIP] < 0.1 && features[NDX_X] >= x1 && features[NDX_X] < x2
+//						&& features[NDX_Y] >= y1 && features[NDX_Y] < y2)
 					buff.push_back(features[NDX_FWHM]);
 			}
 		}
@@ -194,7 +194,7 @@ void AstroDIP::load_catalog() {
 		});
 
 		double fwhm(-1.0);
-		if ((size = buff.size()) > 20) {
+		if ((size = buff.size()) > 5) {
 			int half = size / 2;
 			std::nth_element(buff.begin(), buff.begin() + half, buff.end());
 			fwhm = buff[half];
@@ -220,7 +220,7 @@ void AstroDIP::thread_monitor() {
 	 * @note 2019-11-23
 	 * 判定: 有效目标数量不得少于100
 	 */
-	success = frame_->nfobjs.size() > 100;
+	success = frame_->nfobjs.size();// > 100;
 //	frame_->result = success ? SUCCESS_IMGREDUCT : FAIL_IMGREDUCT;
 	rsltReduct_(success);
 }

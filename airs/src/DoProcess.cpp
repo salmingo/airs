@@ -79,28 +79,33 @@ bool DoProcess::IsOver() {
 /* 处理结果回调函数 */
 void DoProcess::ImageReductResult(bool rslt) {
 	FramePtr frame = reduct_->GetFrame();
-	if (rslt) {
+	if (rslt && param_.doAstrometry) {
 		mutex_lock lck(mtx_frm_astro_);
 		queAstro_.push_back(frame);
 		cv_astro_.notify_one();
 	}
-	if (rslt && tcpc_gc_.unique() && frame->fwhm > 1E-4) {// 通知服务器FWHM
-		apfwhm proto = boost::make_shared<ascii_proto_fwhm>();
-		proto->gid   = frame->gid;
-		proto->uid   = frame->uid;
-		proto->cid   = frame->cid;
-		proto->value = frame->fwhm;
+	if (rslt && frame->fwhm > 1E-4) {// 通知服务器FWHM
+		FILE *fp = fopen("fwhm.txt", "a+");
+		fprintf (fp, "%s  %5.2f\n", frame->filename.c_str(), frame->fwhm);
+		fclose(fp);
+		if (tcpc_gc_.unique()) {
+			apfwhm proto = boost::make_shared<ascii_proto_fwhm>();
+			proto->gid   = frame->gid;
+			proto->uid   = frame->uid;
+			proto->cid   = frame->cid;
+			proto->value = frame->fwhm;
 
-		int n;
-		const char *s = ascproto_->CompactFWHM(proto, n);
-		tcpc_gc_->Write(s, n);
+			int n;
+			const char *s = ascproto_->CompactFWHM(proto, n);
+			tcpc_gc_->Write(s, n);
+		}
 	}
 	cv_reduct_.notify_one();
 }
 
 void DoProcess::AstrometryResult(int rslt) {
 	FramePtr frame = astro_->GetFrame();
-	if (rslt) {// 匹配星表
+	if (rslt && param_.doPhotometry) {// 匹配星表
 		mutex_lock lck(mtx_frm_match_);
 		queMatch_.push_back(frame);
 		cv_match_.notify_one();
@@ -199,7 +204,16 @@ bool DoProcess::check_image(FramePtr frame) {
 	fits_read_key(fitsptr, TSTRING, "DATE-OBS", dateobs,  NULL, &status);
 	if (!(datefull = NULL != strstr(dateobs, "T")))
 		fits_read_key(fitsptr, TSTRING, "TIME-OBS", timeobs,  NULL, &status);
+	if (status) {// Andor Solis格式
+		status = 0;
+		fits_read_key(fitsptr, TSTRING, "DATE", dateobs,  NULL, &status);
+		datefull = true;
+	}
 	fits_read_key(fitsptr, TDOUBLE, "EXPTIME",  &expdur, NULL, &status);
+	if (status) {// Andor Solis格式
+		status = 0;
+		fits_read_key(fitsptr, TDOUBLE, "EXPOSURE",  &expdur, NULL, &status);
+	}
 	if (!status) {
 		fits_read_key(fitsptr, TINT, "FRAMENO",  &frame->fno, NULL, &status);
 		status = 0;
