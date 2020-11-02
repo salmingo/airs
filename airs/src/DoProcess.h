@@ -155,10 +155,6 @@ protected:
 	 */
 	FindPVPtr get_finder(FramePtr frame);
 	/*!
-	 * @brief 标记坏像列
-	 */
-	void mark_badcol(const string& gid, const string& uid, const string& cid, int col);
-	/*!
 	 * @brief 线程: 图像处理
 	 */
 	void thread_reduct();

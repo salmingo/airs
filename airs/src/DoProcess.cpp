@@ -56,6 +56,7 @@ void DoProcess::StopService() {
 	interrupt_thread(thrd_photo_);
 	interrupt_thread(thrd_reconn_gc_);
 	interrupt_thread(thrd_reconn_fileserver_);
+	param_.SaveBadmark();
 }
 
 void DoProcess::ProcessImage(const string &filepath) {
@@ -85,9 +86,6 @@ void DoProcess::ImageReductResult(bool rslt) {
 		cv_astro_.notify_one();
 	}
 	if (rslt && frame->fwhm > 1E-4) {// 通知服务器FWHM
-		FILE *fp = fopen("fwhm.txt", "a+");
-		fprintf (fp, "%s  %5.2f\n", frame->filename.c_str(), frame->fwhm);
-		fclose(fp);
 		if (tcpc_gc_.unique()) {
 			apfwhm proto = boost::make_shared<ascii_proto_fwhm>();
 			proto->gid   = frame->gid;
@@ -250,12 +248,12 @@ bool DoProcess::check_image(FramePtr frame) {
 		frame->secofday = tmmid.time_of_day().total_milliseconds() / 86400000.0;
 		frame->mjd      = tmmid.date().modjulian_day() + frame->secofday;
 
-//		if (frame->gid.empty() || frame->uid.empty() || frame->cid.empty()) {
-//			_gLog->Write(LOG_FAULT, NULL, "File[%s] doesn't give right IDs[%s:%s:%s]",
-//					frame->filename.c_str(),
-//					frame->gid.c_str(), frame->uid.c_str(), frame->cid.c_str());
-//			status = -1;
-//		}
+		if (frame->gid.empty() || frame->uid.empty() || frame->cid.empty()) {
+			_gLog->Write(LOG_FAULT, NULL, "File[%s] doesn't give right IDs[%s:%s:%s]",
+					frame->filename.c_str(),
+					frame->gid.c_str(), frame->uid.c_str(), frame->cid.c_str());
+			status = -1;
+		}
 	}
 	return (status == 0);
 }
@@ -272,19 +270,11 @@ DoProcess::FindPVPtr DoProcess::get_finder(FramePtr frame) {
 	if (it != itend) finder = *it;
 	else {
 		finder = boost::make_shared<AFindPV>(&param_);
-		const AFindPV::CBFMarkColSlot &slot = boost::bind(&DoProcess::mark_badcol, this, _1, _2, _3, _4);
-		finder->RegisterMarkCol(slot);
 		finder->SetIDs(gid, uid, cid);
 		finders_.push_back(finder);
 	}
 
 	return finder;
-}
-
-void DoProcess::mark_badcol(const string& gid, const string& uid, const string& cid, int col) {
-	// 通知AstroDIP
-
-	// 保存到xml文件
 }
 
 void DoProcess::thread_reduct() {

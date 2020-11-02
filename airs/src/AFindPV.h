@@ -24,8 +24,10 @@
 #define ASPERDAY	24
 // 5"=1.388889E-3°
 #define DEG5AS		1.388889E-3
+#define DEG10AS		2.777778E-3
 #define MINFRAME	5	//< 有效数据最少帧数
-#define INTFRAME	10	//< 数据点间最大帧间隔
+#define INTFRAME	5	//< 数据点间最大帧间隔
+#define BADCNT		5	//< 坏点/列次数判定阈值
 
 namespace AstroUtil {
 //////////////////////////////////////////////////////////////////////////////
@@ -44,6 +46,8 @@ typedef struct pv_point {// 单数据点
 	double mag;			//< 星等
 	double magerr;		//< 星等误差
 	double snr;			//< 积分信噪比
+	// 修订时间和光行差
+	bool corrected;
 
 public:
 	pv_point &operator=(const OneFrame &frame) {
@@ -64,6 +68,7 @@ public:
 		mag    = obj.features[NDX_MAG];
 		magerr = obj.features[NDX_MAGERR];
 		snr    = 0.0;
+		corrected = false;
 
 		return *this;
 	}
@@ -129,7 +134,8 @@ public:
 		dx = fabs(pt->ra - x);
 		dy = fabs(pt->dc - y);
 		if (dx > 180.0) dx = 360.0 - dx;
-		return (dx <= DEG5AS && dy <= DEG5AS);
+//		return (dx <= DEG5AS && dy <= DEG5AS);
+		return (dx < DEG10AS && dy < DEG10AS);
 	}
 
 	/*!
@@ -234,18 +240,48 @@ public:
 		col = hit = 0;
 	}
 
-	int test(int c) {
-		if (fabs(col - c) <= 2) ++hit;
-		return hit;
+	uncertain_badcol(int c) {
+		col = c;
+		hit = 1;
+	}
+
+	bool isColumn(int c) {
+		return abs(col - c) <= 2;
+	}
+
+	int inc() {
+		return ++hit;
 	}
 };
 typedef std::vector<uncertain_badcol> UncBadcolVec;
 
-class AFindPV {
-public:
-	typedef boost::signals2::signal<void (const string&, const string&, const string&, int)> CBFMarkCol;	//< 回调函数, 标记坏列
-	typedef CBFMarkCol::slot_type CBFMarkColSlot;
+struct uncertain_badpix {
+	int row, col;	//< 行列编号
+	int hit;		//< 命中率
 
+public:
+	uncertain_badpix() {
+		row = col = 0;
+		hit = 0;
+	}
+
+	uncertain_badpix(int _row, int _col) {
+		row = _row;
+		col = _col;
+		hit = 1;
+	}
+
+	bool isPixel(int r, int c) {
+		return (row == r && col == c);
+	}
+
+	int inc() {
+		return ++hit;
+	}
+};
+typedef std::vector<uncertain_badpix> UncBadpixVec;
+
+class AFindPV {
 protected:
 	/* 数据类型 */
 	typedef boost::shared_ptr<boost::thread> threadptr;
@@ -274,7 +310,7 @@ protected:
 	string dirgtw_;		//< GTW格式输出文件的目录名
 	string utcdate_;	//< UTC日期
 	UncBadcolVec uncbadcol_;	//< 不确定的坏列
-	CBFMarkCol cbfMakrCol_;		//< 回调函数, 标记坏列
+	UncBadpixVec uncbadpix_;	//< 不确定的坏点
 
 	boost::mutex mtx_frmque_;	//< 互斥锁: 图像队列
 	FrameQue frmque_;			//< 队列: 待处理图像
@@ -284,6 +320,11 @@ protected:
 	boost::shared_ptr<DBCurl> dbt_;		//< 数据库接口
 
 protected:
+	/*!
+	 * @brief 剔除坏像素
+	 * @param frame  帧地址
+	 */
+	void remove_badpix(FramePtr frame);
 	/*!
 	 * @brief 开始处理一段连续数据
 	 */
@@ -330,7 +371,8 @@ protected:
 	 * @brief 将一个候选体转换为目标
 	 */
 	void candidate2object(PvCanPtr can);
-	bool is_badcol(int col);
+	bool test_badcol(int col);
+	bool test_badpix(int col, int row);
 	/*!
 	 * @brief 维护输出目录
 	 */
@@ -369,9 +411,7 @@ protected:
 
 public:
 	void SetIDs(const string& gid, const string& uid, const string& cid);
-	bool IsMatched(const string& gid, const string& uid, const string& cid);
-	void RegisterMarkCol(const CBFMarkColSlot &slot);
-	/*!
+	bool IsMatched(const string& gid, const string& uid, const string& cid);	/*!
 	 * @brief 处理新的数据帧
 	 */
 	void NewFrame(FramePtr frame);

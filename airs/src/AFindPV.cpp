@@ -45,10 +45,6 @@ bool AFindPV::IsMatched(const string& gid, const string& uid, const string& cid)
 	return (gid_ == gid && uid_ == uid && cid_ == cid);
 }
 
-void AFindPV::RegisterMarkCol(const CBFMarkColSlot &slot) {
-	cbfMakrCol_.connect(slot);
-}
-
 void AFindPV::NewFrame(FramePtr frame) {
 	mutex_lock lck(mtx_frmque_);
 	frmque_.push_back(frame);
@@ -70,6 +66,7 @@ void AFindPV::end_sequence() {
 		frmnow_.reset();
 		cans_.clear();
 		uncbadcol_.clear();
+		uncbadpix_.clear();
 	}
 }
 
@@ -82,14 +79,27 @@ void AFindPV::new_frame(FramePtr frame) {
 	frmnow_->rac      = frame->rac;
 	frmnow_->decc     = frame->decc;
 
+	ptime frmmid = from_iso_extended_string(frame->tmmid);
+	ptime objmid;
+	double tread(125.0);
+	double lines(4096.0);
+	double tline = tread / lines;
+
 	NFObjVec &objs = frame->nfobjs;
 	PvPtVec &pts = frmnow_->pts;
 	int n = objs.size();
+
 	for (int i = 0; i < n; ++i) {
 		PvPtPtr pt = boost::make_shared<PvPt>();
 		*pt = *frame;
 		*pt = *(objs[i]);
 		pt->id = objs[i]->id;
+		// 修正rolling shutter在不同行的时间偏差
+		objmid = frmmid + millisec(int((pt->y * tline)));
+		pt->tmmid = to_iso_extended_string(objmid);
+		// 修正周年光行差
+		correct_annual_aberration(pt);
+
 		pts.push_back(pt);
 	}
 }
@@ -121,6 +131,7 @@ void AFindPV::cross_match() {
 			dx = fabs((*it2)->ra - (*it1)->ra);
 			if (dx > 180.0) dx = 360.0 - dx;
 			if (dx <= DEG5AS && dy <= DEG5AS) {
+//			if (dx < DEG10AS && dy < DEG5AS) {
 				(*it1)->matched = 2;
 				(*it2)->matched = 2;
 				++n2;
@@ -228,11 +239,68 @@ void AFindPV::complete_candidates() {
 	}
 }
 
-bool AFindPV::is_badcol(int col) {
-	for (UncBadcolVec::iterator it = uncbadcol_.begin(); it != uncbadcol_.end(); ++it) {
-		if (it->test(col) > 3) return true;
+bool AFindPV::test_badcol(int col) {
+	int hit(1);
+	UncBadcolVec::iterator it;
+	for (it = uncbadcol_.begin(); !(it == uncbadcol_.end() || it->isColumn(col)); ++it);
+	if (it != uncbadcol_.end()) {
+		if ((hit = (*it).inc()) >= BADCNT) {
+			uncbadcol_.erase(it);
+			param_->AddBadcol(gid_, uid_, cid_, col);
+		}
 	}
-	return false;
+	else {
+		uncertain_badcol badcol(col);
+		uncbadcol_.push_back(badcol);
+	}
+	return hit >= BADCNT;
+}
+
+bool AFindPV::test_badpix(int col, int row) {
+	int hit(1);
+	UncBadpixVec::iterator it;
+	for (it = uncbadpix_.begin(); !(it == uncbadpix_.end() || it->isPixel(row, col)); ++it);
+	if (it != uncbadpix_.end()) {
+		if ((hit = (*it).inc()) >= BADCNT) {
+			uncbadpix_.erase(it);
+			param_->AddBadpix(gid_, uid_, cid_, col, row);
+		}
+	}
+	else {
+		uncertain_badpix badpix(row, col);
+		uncbadpix_.push_back(badpix);
+	}
+
+	return hit >= BADCNT;
+}
+
+void AFindPV::remove_badpix(FramePtr frame) {
+	string gid = frame->gid;
+	string uid = frame->uid;
+	string cid = frame->cid;
+	NFObjVec& objs = frame->nfobjs;
+	int row, col;
+
+	CameraBadcol* badcol = param_->GetBadcol(gid, uid, cid);
+	if (badcol) {
+		for (NFObjVec::iterator it = objs.begin(); it != objs.end(); ) {
+			col = int((*it)->features[NDX_X] + 0.5);
+			if (badcol->test(col)) {
+				it = objs.erase(it);
+			}
+			else ++it;
+		}
+	}
+
+	CameraBadpix* badpix = param_->GetBadpix(gid, uid, cid);
+	if (badpix) {
+		for (NFObjVec::iterator it = objs.begin(); it != objs.end(); ) {
+			row = int((*it)->features[NDX_Y] + 0.5);
+			col = int((*it)->features[NDX_X] + 0.5);
+			if (badpix->test(col, row)) it = objs.erase(it);
+			else ++it;
+		}
+	}
 }
 
 void AFindPV::candidate2object(PvCanPtr can) {
@@ -264,25 +332,14 @@ void AFindPV::candidate2object(PvCanPtr can) {
 	ysig = ysig >= 0.0 ? sqrt(ysig) : 0.0;
 	/* 识别热点和坏列 */
 	if ((xmax - xmin) <= 2.0 && xsig < 1.0) {
-		if (!(noise = (ymax - ymin) <= 2.0 && ysig < 1.0)) {
-			noise = is_badcol(int((xmax + xmin) * 0.5));
-			if (noise) {
-
-			}
+		noise = test_badcol(int((xmax + xmin) * 0.5 + 0.5));	// 坏列
+		if (!noise && (ymax - ymin) <= 2.0 && ysig < 1.0) {// 热点?
+			noise = test_badpix(int((xmax + xmin) * 0.5 + 0.5), int((ymin + ymax) * 0.5 + 0.5));
 		}
 	}
 	/*------------------------------------------------------------*/
 	if (!noise) {
-		ptime tmmid;
-		double tread(125.0);
-		double lines(4096.0);
-		double tline = tread / lines;
 		for (PvPtVec::iterator it = pts.begin(); it != pts.end(); ++it) {
-			// 修正rolling shutter在不同行的时间偏差
-			tmmid = from_iso_extended_string((*it)->tmmid) + millisec(int(((*it)->y * tline)));
-			(*it)->tmmid = to_iso_extended_string(tmmid);
-			// 修正周年光行差
-			correct_annual_aberration(*it);
 			npts.push_back(*it);
 		}
 		upload_orbit(obj);
@@ -555,6 +612,7 @@ void AFindPV::thread_newframe() {
 				new_sequence();
 				create_dir(frame);
 			}
+			remove_badpix(frame);
 			upload_ot(frame);
 			new_frame(frame);
 			cross_match();

@@ -1,10 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <version>0.1</version>
-<date>20191202T010547</date>
+<date>20200901T005415</date>
 <GeoSite Name="HN">
     <Location Lon="111.714" Lat="16.450800000000001" Alt="10" Timezone="8"/>
 </GeoSite>
-<Output Path="/Users/lxm/Data"/>
+<Output Path="/Users/lxm/Data/output"/>
+<BadMark Path="/usr/local/etc/badmark_airs.xml" />
 <Work Path="/Users/lxm/Data/Temp"/>
 <SampleWindow Size="512"/>
 <Reduction PathExe="/usr/local/bin/sex" PathConfig="/usr/local/etc/sex-param/default.sex"/>
