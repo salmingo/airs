@@ -15,6 +15,7 @@
 #include <string>
 #include <cmath>
 #include <deque>
+#include <utility>
 #include "airsdata.h"
 #include "Parameter.h"
 #include "DBCurl.h"
@@ -22,6 +23,7 @@
 // 2.78E-4 = 1″/s
 // 1"/s=24°/day
 #define ASPERDAY	24
+#define AS15PERDAY	360
 // 5"=1.388889E-3°
 #define DEG5AS		1.388889E-3
 #define DEG10AS		2.777778E-3
@@ -107,7 +109,6 @@ typedef struct pv_candidate {// 候选体
 	PvPtVec pts;	//< 已确定数据点集合
 	PvPtVec frmu;	//< 由当前帧加入的不确定数据点
 	double xs, ys;	//< RA/DEC变化速度
-	int badcol;		//< 坏列标记. 0: 非; 1: 疑似; 2: 确认
 
 public:
 	int sign_rate(double rate) {
@@ -134,7 +135,6 @@ public:
 		dx = fabs(pt->ra - x);
 		dy = fabs(pt->dc - y);
 		if (dx > 180.0) dx = 360.0 - dx;
-//		return (dx <= DEG5AS && dy <= DEG5AS);
 		return (dx < DEG10AS && dy < DEG10AS);
 	}
 
@@ -156,7 +156,6 @@ public:
 		pts.push_back(pt1);
 		pts.push_back(pt2);
 		move_speed(pt1, pt2, &xs, &ys);
-		badcol = 0;
 	}
 
 	/*!
@@ -203,17 +202,20 @@ public:
 		double xrate, yrate;
 		int xsgn, ysgn;
 
-		move_speed(pts[0], pts[1], &xrate, &yrate);
+		move_speed(pts[0], last_point(), &xrate, &yrate);
 		xsgn = sign_rate(xrate);
 		ysgn = sign_rate(yrate);
-		// 检测速度方向一致性
-		for (i = 2; i < n && valid; ++i) {
-			move_speed(pts[i - 1], pts[i], &xrate, &yrate);
-			valid = sign_rate(xrate) == xsgn && sign_rate(yrate) == ysgn;
-		}
-		if (!valid) {
-			for (i = 2; i < n; ++i) pts[i]->dec_rel();
-			pts.clear();
+		valid = xsgn || ysgn;
+		if (valid) {// 规避: 恒星交叉判定失败. 2019-11-16一个数据避开该判定
+			// 检测速度方向一致性
+			for (i = 2; i < n && valid; ++i) {
+				move_speed(pts[i - 1], pts[i], &xrate, &yrate);
+				valid = sign_rate(xrate) == xsgn && sign_rate(yrate) == ysgn;
+			}
+			if (!valid) {
+				for (i = 2; i < n; ++i) pts[i]->dec_rel();
+				pts.clear();
+			}
 		}
 		return valid;
 	}
@@ -281,6 +283,108 @@ public:
 };
 typedef std::vector<uncertain_badpix> UncBadpixVec;
 
+/*!
+ * @struct doubt_pixel
+ * @brief 可疑的像元
+ * @note
+ * 构成弧段数据的xy坐标基本不变, 需判定是否坏点
+ */
+struct doubt_pixel {
+	typedef boost::shared_ptr<doubt_pixel> Pointer;
+	typedef std::pair<string, string> objpair;
+
+	int col, row;	///< 坐标
+	int count;		///< 命中率
+	double mjd;		///< 弧端结束时间
+
+	std::vector<objpair> pathobj;	///< 上传数据库的文件路径
+	std::vector<string> pathtxt;	///< 本地txt文件路径
+	std::vector<string> pathgtw;	///< 本地gtw文件路径
+
+public:
+	doubt_pixel() {
+		col = row = -1;
+		count = 0;
+		mjd = 0.0;
+	}
+
+	doubt_pixel(int c, int r) {
+		col = c;
+		row = r;
+		count = 0;
+		mjd = 0.0;
+	}
+
+	static Pointer create() {
+		return Pointer(new doubt_pixel);
+	}
+
+	static Pointer create(int c, int r) {
+		return Pointer(new doubt_pixel(c, r));
+	}
+
+	bool is_same(int c, int r) {
+		return (abs(col - c) <= 2 && abs(row - r) <= 2);
+	}
+
+	bool is_bad() {
+		return count >= 2;
+	}
+
+	int inc(double mjdb, double mjde) {
+		double t(6.9444444E-4);	// 60s=>day: 60 / 86400
+		if ((mjdb - mjd) > t) ++count;
+		mjd = mjde;
+		return count;
+	}
+
+	void reset() {
+		pathobj.clear();
+		pathtxt.clear();
+		pathgtw.clear();
+	}
+
+	void addpath_obj(const string& path, const string& objname) {
+		objpair obj(path, objname);
+		pathobj.push_back(obj);
+	}
+
+	void addpath_txt(const string& path) {
+		pathtxt.push_back(path);
+	}
+
+	void addpath_gtw(const string& path) {
+		pathgtw.push_back(path);
+	}
+};
+typedef doubt_pixel::Pointer DoubtPixPtr;
+
+/*!
+ * @struct doubt_pixel_set
+ * @brief 可疑的像元集合
+ */
+struct doubt_pixel_set {
+	std::vector<DoubtPixPtr> pixels;
+
+public:
+	DoubtPixPtr get(int c, int r) {
+		DoubtPixPtr ptr;
+		std::vector<DoubtPixPtr>::iterator it;
+		for (it = pixels.begin(); it != pixels.end() && !(*it)->is_same(c, r); ++it);
+		if (it == pixels.end()) {
+			ptr = doubt_pixel::create(c, r);
+			pixels.push_back(ptr);
+		}
+		else ptr = *it;
+
+		return ptr;
+	}
+
+	void reset() {
+		pixels.clear();
+	}
+};
+
 class AFindPV {
 protected:
 	/* 数据类型 */
@@ -310,7 +414,8 @@ protected:
 	string dirgtw_;		//< GTW格式输出文件的目录名
 	string utcdate_;	//< UTC日期
 	UncBadcolVec uncbadcol_;	//< 不确定的坏列
-	UncBadpixVec uncbadpix_;	//< 不确定的坏点
+//	UncBadpixVec uncbadpix_;	//< 不确定的坏点
+	doubt_pixel_set doubtPixSet_;	//< 可疑的像元集合
 
 	boost::mutex mtx_frmque_;	//< 互斥锁: 图像队列
 	FrameQue frmque_;			//< 队列: 待处理图像
@@ -372,7 +477,14 @@ protected:
 	 */
 	void candidate2object(PvCanPtr can);
 	bool test_badcol(int col);
-	bool test_badpix(int col, int row);
+//	bool test_badpix(int col, int row);
+	/*!
+	 * @brief 复核可疑像元数据
+	 * @note
+	 * - 若确认是坏点, 则删除相关文件
+	 * - 若无法确认, 则保留相关文件并上传
+	 */
+	void recheck_doubt();
 	/*!
 	 * @brief 维护输出目录
 	 */
@@ -384,11 +496,11 @@ protected:
 	/*!
 	 * @brief 保存及上传关联结果
 	 */
-	void upload_orbit(PvObjPtr obj);
+	void upload_orbit(PvObjPtr obj, DoubtPixPtr ptr);
 	/*!
 	 * @breif 保存GTW格式结果
 	 */
-	void save_gtw_orbit(PvObjPtr obj);
+	void save_gtw_orbit(PvObjPtr obj, DoubtPixPtr ptr);
 	/*!
 	 * @brief 线程: 处理图像队列
 	 */

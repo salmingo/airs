@@ -8,7 +8,6 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <unistd.h>
-#include <boost/bind.hpp>
 
 #include "daemon.h"
 

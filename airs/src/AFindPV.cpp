@@ -33,6 +33,7 @@ AFindPV::AFindPV(Parameter *param) {
 AFindPV::~AFindPV() {
 	thrd_newfrm_->interrupt();
 	thrd_newfrm_->join();
+	recheck_doubt();	// 人工时的特殊处理
 }
 
 void AFindPV::SetIDs(const string& gid, const string& uid, const string& cid) {
@@ -66,7 +67,7 @@ void AFindPV::end_sequence() {
 		frmnow_.reset();
 		cans_.clear();
 		uncbadcol_.clear();
-		uncbadpix_.clear();
+//		uncbadpix_.clear();
 	}
 }
 
@@ -119,16 +120,19 @@ void AFindPV::cross_match() {
 	if (!frmprev_.unique()) return;
 	PvPtVec &prev = frmprev_->pts;
 	PvPtVec &now  = frmnow_->pts;
-	double dx, dy;
+	double dx, dy, ra, dc;
 	int n0(0), n2(0);
+
 	for (PvPtVec::iterator it1 = prev.begin(); it1 != prev.end(); ++it1) {
 		if ((*it1)->matched) continue;
 		++n0;
+		ra = (*it1)->ra;
+		dc = (*it1)->dc;
 		for (PvPtVec::iterator it2 = now.begin(); it2 != now.end(); ++it2) {
 			if ((*it2)->matched) continue;
 
-			dy = fabs((*it2)->dc - (*it1)->dc);
-			dx = fabs((*it2)->ra - (*it1)->ra);
+			dy = fabs((*it2)->dc - dc);
+			dx = fabs((*it2)->ra - ra);
 			if (dx > 180.0) dx = 360.0 - dx;
 			if (dx <= DEG5AS && dy <= DEG5AS) {
 //			if (dx < DEG10AS && dy < DEG5AS) {
@@ -189,7 +193,7 @@ void AFindPV::create_candidates() {
 			if (!((*itnow)->matched || (*itnow)->related)) {
 				x2 = (*itnow)->x;
 				y2 = (*itnow)->y;
-				if (fabs(x2 - x1) <= 100 && fabs(y2 - y1) <= 100) {
+				if (fabs(x2 - x1) <= 150 && fabs(y2 - y1) <= 150) {
 					PvCanPtr can = boost::make_shared<PvCan>();
 					can->create(*itprev, *itnow);
 					cans_.push_back(can);
@@ -256,31 +260,31 @@ bool AFindPV::test_badcol(int col) {
 	return hit >= BADCNT;
 }
 
-bool AFindPV::test_badpix(int col, int row) {
-	int hit(1);
-	UncBadpixVec::iterator it;
-	for (it = uncbadpix_.begin(); !(it == uncbadpix_.end() || it->isPixel(row, col)); ++it);
-	if (it != uncbadpix_.end()) {
-		if ((hit = (*it).inc()) >= BADCNT) {
-			uncbadpix_.erase(it);
-			param_->AddBadpix(gid_, uid_, cid_, col, row);
-		}
-	}
-	else {
-		uncertain_badpix badpix(row, col);
-		uncbadpix_.push_back(badpix);
-	}
-
-	return hit >= BADCNT;
-}
+//bool AFindPV::test_badpix(int col, int row) {
+//	int hit(1);
+//	UncBadpixVec::iterator it;
+//	for (it = uncbadpix_.begin(); !(it == uncbadpix_.end() || it->isPixel(row, col)); ++it);
+//	if (it != uncbadpix_.end()) {
+//		if ((hit = (*it).inc()) >= BADCNT) {
+//			uncbadpix_.erase(it);
+//			param_->AddBadpix(gid_, uid_, cid_, col, row);
+//		}
+//	}
+//	else {
+//		uncertain_badpix badpix(row, col);
+//		uncbadpix_.push_back(badpix);
+//	}
+//
+//	return hit >= BADCNT;
+//}
 
 void AFindPV::remove_badpix(FramePtr frame) {
 	string gid = frame->gid;
 	string uid = frame->uid;
 	string cid = frame->cid;
 	NFObjVec& objs = frame->nfobjs;
-	int row, col;
-
+//	int row;
+	int col;
 	CameraBadcol* badcol = param_->GetBadcol(gid, uid, cid);
 	if (badcol) {
 		for (NFObjVec::iterator it = objs.begin(); it != objs.end(); ) {
@@ -291,7 +295,7 @@ void AFindPV::remove_badpix(FramePtr frame) {
 			else ++it;
 		}
 	}
-
+/*
 	CameraBadpix* badpix = param_->GetBadpix(gid, uid, cid);
 	if (badpix) {
 		for (NFObjVec::iterator it = objs.begin(); it != objs.end(); ) {
@@ -301,6 +305,28 @@ void AFindPV::remove_badpix(FramePtr frame) {
 			else ++it;
 		}
 	}
+*/
+}
+
+void AFindPV::recheck_doubt() {
+	int i, n;
+	std::vector<DoubtPixPtr>& pixels = doubtPixSet_.pixels;
+
+	for (std::vector<DoubtPixPtr>::iterator it = pixels.begin(); it != pixels.end(); ++it) {
+		n = (*it)->pathobj.size();
+		for (i = 0; i < n; ++i) {
+			if ((*it)->is_bad()) {
+				remove((*it)->pathtxt[i]);
+				remove((*it)->pathgtw[i]);
+			}
+			else if (dbt_.unique()) {
+				if (dbt_->UploadOrbit((*it)->pathobj[i].first, (*it)->pathobj[i].second))
+					_gLog->Write(LOG_FAULT, "AFindPV::upload_orbit()", "%s", dbt_->GetErrmsg());
+			}
+			remove((*it)->pathobj[i].first);
+		}
+		(*it)->reset();
+	}
 }
 
 void AFindPV::candidate2object(PvCanPtr can) {
@@ -308,8 +334,8 @@ void AFindPV::candidate2object(PvCanPtr can) {
 	PvObjPtr obj = boost::make_shared<PvObj>();
 	PvPtVec &npts = obj->pts;
 	/*---------- 过滤热点: 2020-06 ----------*/
-	bool noise(false);
-	int n = pts.size();
+	bool noise(false), doubtable(false);
+	int n = pts.size(), row, col;
 	double x, y, xsum(0.0), xsq(0.0), ysum(0.0), ysq(0.0), xsig, ysig;
 	double xmin(1E30), xmax(0.0), ymin(1E30), ymax(0.0);
 
@@ -332,18 +358,28 @@ void AFindPV::candidate2object(PvCanPtr can) {
 	ysig = ysig >= 0.0 ? sqrt(ysig) : 0.0;
 	/* 识别热点和坏列 */
 	if ((xmax - xmin) <= 2.0 && xsig < 1.0) {
-		noise = test_badcol(int((xmax + xmin) * 0.5 + 0.5));	// 坏列
+		col = int((xmax + xmin) * 0.5 + 0.5);
+		row = int((ymin + ymax) * 0.5 + 0.5);
+		noise = test_badcol(col);	// 坏列
 		if (!noise && (ymax - ymin) <= 2.0 && ysig < 1.0) {// 热点?
-			noise = test_badpix(int((xmax + xmin) * 0.5 + 0.5), int((ymin + ymax) * 0.5 + 0.5));
+//			noise = test_badpix(col, row);
+			doubtable = true;
 		}
 	}
 	/*------------------------------------------------------------*/
 	if (!noise) {
-		for (PvPtVec::iterator it = pts.begin(); it != pts.end(); ++it) {
-			npts.push_back(*it);
+		DoubtPixPtr ptr;
+		if (doubtable) {
+			ptr = doubtPixSet_.get(col, row);
+			ptr->inc(pts[0]->mjd, pts[n-1]->mjd);
 		}
-		upload_orbit(obj);
-		save_gtw_orbit(obj);
+		if (!(ptr.use_count() && ptr->is_bad())) {
+			for (PvPtVec::iterator it = pts.begin(); it != pts.end(); ++it) {
+				npts.push_back(*it);
+			}
+			upload_orbit(obj, ptr);
+			save_gtw_orbit(obj, ptr);
+		}
 	}
 }
 
@@ -367,6 +403,8 @@ void AFindPV::create_dir(FramePtr frame) {
 		pathgtw /= utcdate_;
 		if (!exists(pathgtw, ec)) create_directory(pathgtw, ec);
 		if (!ec) dirgtw_ = pathgtw.string();
+		// 重置可疑像元空间
+		doubtPixSet_.reset();
 
 		_gLog->Write("Output Dir: %s,  %s", dirname_.c_str(), dirgtw_.c_str());
 	}
@@ -399,7 +437,7 @@ void AFindPV::upload_ot(FramePtr frame) {
 	}
 }
 
-void AFindPV::upload_orbit(PvObjPtr obj) {
+void AFindPV::upload_orbit(PvObjPtr obj, DoubtPixPtr ptr) {
 	PvPtVec &pts = obj->pts;
 	int npts = pts.size(), i;
 	string objname = utcdate_ + "_" + std::to_string(++idpv_);
@@ -418,13 +456,18 @@ void AFindPV::upload_orbit(PvObjPtr obj) {
 		}
 		fclose(fpobj);
 
-		if (dbt_->UploadOrbit(dirname_, objname))
-			_gLog->Write(LOG_FAULT, "AFindPV::upload_orbit()", "%s", dbt_->GetErrmsg());
-		remove(objpath);
+		if (ptr.use_count()) ptr->addpath_obj(objpath.string(), objname);
+		else {
+			if (dbt_->UploadOrbit(dirname_, objname))
+				_gLog->Write(LOG_FAULT, "AFindPV::upload_orbit()", "%s", dbt_->GetErrmsg());
+			remove(objpath);
+		}
 	}
 
 	// 生成完整轨迹文件
 	objpath.replace_extension(path(".txt"));
+	if (ptr.use_count()) ptr->addpath_txt(objpath.string());
+
 	FILE *fpdst = fopen(objpath.c_str(), "w");
 	PvPtPtr pt;
 	ptime tmmid;
@@ -541,7 +584,7 @@ void AFindPV::mag_convert(double mag, string &str) {
 	str = (fmt % sign % int(mag * 10)).str();
 }
 
-void AFindPV::save_gtw_orbit(PvObjPtr obj) {
+void AFindPV::save_gtw_orbit(PvObjPtr obj, DoubtPixPtr ptr) {
 	PvPtVec &pts = obj->pts;
 	int npts = pts.size(), i;
 	string objname = utcdate_ + "_" + std::to_string(idpv_);
@@ -555,19 +598,22 @@ void AFindPV::save_gtw_orbit(PvObjPtr obj) {
 	utc_convert_1(pts[npts - 1]->tmmid, tm_end);
 	objname = (fmtname % tm_begin.c_str() % SID_).str();
 	objpath /= objname;
+
+	if (ptr.use_count()) ptr->addpath_gtw(objpath.string());
+
 	fpdst = fopen(objpath.c_str(), "w");
 
 	// 文件头
 	fprintf (fpdst, "C %s\r\n", objname.c_str());	// Line 1
-	fprintf (fpdst, "C 201901010101.JHF\r\n");								// Line 2
-	fprintf (fpdst, "C %s\r\n", tm_begin.c_str());							// Line 3
-	fprintf (fpdst, "C %s\r\n", tm_end.c_str());							// Line 4
-	fprintf (fpdst, "C \r\n");												// Line 5
-	fprintf (fpdst, "C \r\n");												// Line 6
-	fprintf (fpdst, "C \r\n");												// Line 7
-	fprintf (fpdst, "C \r\n");												// Line 8
-	fprintf (fpdst, "C \r\n");												// Line 9
-	fprintf (fpdst, "C \r\n");												// Line 10
+	fprintf (fpdst, "C 201901010101.JHF\r\n");		// Line 2
+	fprintf (fpdst, "C %s\r\n", tm_begin.c_str());	// Line 3
+	fprintf (fpdst, "C %s\r\n", tm_end.c_str());	// Line 4
+	fprintf (fpdst, "C \r\n");						// Line 5
+	fprintf (fpdst, "C \r\n");						// Line 6
+	fprintf (fpdst, "C \r\n");						// Line 7
+	fprintf (fpdst, "C \r\n");						// Line 8
+	fprintf (fpdst, "C \r\n");						// Line 9
+	fprintf (fpdst, "C \r\n");						// Line 10
 	// 数据区
 	for (i = 0; i < npts; ++i) {
 		pt = pts[i];
@@ -588,7 +634,7 @@ void AFindPV::save_gtw_orbit(PvObjPtr obj) {
 void AFindPV::thread_newframe() {
 	boost::mutex mtx;
 	mutex_lock lck(mtx);
-	boost::chrono::minutes period(1);
+	boost::chrono::seconds period(30);
 
 	while (1) {
 		if (frmque_.empty()) // 当无待处理图像时, 延时等待
@@ -603,6 +649,7 @@ void AFindPV::thread_newframe() {
 		if (!frame.use_count()) {// 无图像可处理, 则结束序列
 			if (last_fno_ != INT_MAX) {
 				end_sequence();
+				recheck_doubt();
 				last_fno_ = INT_MAX;
 			}
 		}

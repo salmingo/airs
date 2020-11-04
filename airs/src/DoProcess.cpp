@@ -57,6 +57,10 @@ void DoProcess::StopService() {
 	interrupt_thread(thrd_reconn_gc_);
 	interrupt_thread(thrd_reconn_fileserver_);
 	param_.SaveBadmark();
+
+	for (FindPVVec::iterator it = finders_.begin(); it != finders_.end(); ++it) {
+		(*it).reset(); // 强制执行AFindPV的析构函数
+	}
 }
 
 void DoProcess::ProcessImage(const string &filepath) {
@@ -189,73 +193,78 @@ bool DoProcess::check_image(FramePtr frame) {
 	path filepath(frame->filepath);
 	copy_sexcfg(filepath.parent_path().string());
 
-	// 读取文件头信息
-	fitsfile *fitsptr;	//< 基于cfitsio接口的文件操作接口
-	int status(0);
-	char dateobs[30], timeobs[30], temp[30];
-	bool datefull;
-	double expdur;
+	try {
+		// 读取文件头信息
+		fitsfile *fitsptr;	//< 基于cfitsio接口的文件操作接口
+		int status(0);
+		char dateobs[30], timeobs[30], temp[30];
+		bool datefull;
+		double expdur;
 
-	fits_open_file(&fitsptr, frame->filepath.c_str(), 0, &status);
-	fits_read_key(fitsptr, TINT, "NAXIS1", &frame->wimg, NULL, &status);
-	fits_read_key(fitsptr, TINT, "NAXIS2", &frame->himg, NULL, &status);
-	fits_read_key(fitsptr, TSTRING, "DATE-OBS", dateobs,  NULL, &status);
-	if (!(datefull = NULL != strstr(dateobs, "T")))
-		fits_read_key(fitsptr, TSTRING, "TIME-OBS", timeobs,  NULL, &status);
-	if (status) {// Andor Solis格式
-		status = 0;
-		fits_read_key(fitsptr, TSTRING, "DATE", dateobs,  NULL, &status);
-		datefull = true;
-	}
-	fits_read_key(fitsptr, TDOUBLE, "EXPTIME",  &expdur, NULL, &status);
-	if (status) {// Andor Solis格式
-		status = 0;
-		fits_read_key(fitsptr, TDOUBLE, "EXPOSURE",  &expdur, NULL, &status);
-	}
-	if (!status) {
-		fits_read_key(fitsptr, TINT, "FRAMENO",  &frame->fno, NULL, &status);
-		status = 0;
-	}
-	frame->expdur = expdur;
-	if (!status) {// 不存在关键字的特殊处理
-		fits_read_key(fitsptr, TSTRING, "GROUP_ID", temp, NULL, &status);
-		frame->gid = temp;
-		fits_read_key(fitsptr, TSTRING, "UNIT_ID", temp, NULL, &status);
-		frame->uid = temp;
-		fits_read_key(fitsptr, TSTRING, "CAM_ID", temp, NULL, &status);
-		frame->cid = temp;
-
-		fits_read_key(fitsptr, TDOUBLE, "OBJCTRA",  &frame->raobj,  NULL, &status);
-		fits_read_key(fitsptr, TDOUBLE, "OBJCTDEC", &frame->decobj, NULL, &status);
-
-		status = 0;
-	}
-	fits_close_file(fitsptr, &status);
-
-	if (!status) {
-		path filepath(frame->filepath);
-		char tmfull[40];
-
-		frame->filename = filepath.filename().string();
-		if (!datefull) sprintf(tmfull, "%sT%s", dateobs, timeobs);
-		frame->tmobs = datefull ? dateobs : tmfull;
-		ptime tmobs  = from_iso_extended_string(frame->tmobs);
-		// QHY CMOS 4040的两个时标(毫秒)
-		// 300: 曝光指令执行延迟
-		// 125: 读出时间延迟
-		ptime tmmid  = tmobs + millisec(int(expdur * 500.0) + 300);
-		frame->tmmid = to_iso_extended_string(tmmid);
-		frame->secofday = tmmid.time_of_day().total_milliseconds() / 86400000.0;
-		frame->mjd      = tmmid.date().modjulian_day() + frame->secofday;
-
-		if (frame->gid.empty() || frame->uid.empty() || frame->cid.empty()) {
-			_gLog->Write(LOG_FAULT, NULL, "File[%s] doesn't give right IDs[%s:%s:%s]",
-					frame->filename.c_str(),
-					frame->gid.c_str(), frame->uid.c_str(), frame->cid.c_str());
-			status = -1;
+		fits_open_file(&fitsptr, frame->filepath.c_str(), 0, &status);
+		fits_read_key(fitsptr, TINT, "NAXIS1", &frame->wimg, NULL, &status);
+		fits_read_key(fitsptr, TINT, "NAXIS2", &frame->himg, NULL, &status);
+		fits_read_key(fitsptr, TSTRING, "DATE-OBS", dateobs,  NULL, &status);
+		if (!(datefull = NULL != strstr(dateobs, "T")))
+			fits_read_key(fitsptr, TSTRING, "TIME-OBS", timeobs,  NULL, &status);
+		if (status) {// Andor Solis格式
+			status = 0;
+			fits_read_key(fitsptr, TSTRING, "DATE", dateobs,  NULL, &status);
+			datefull = true;
 		}
+		fits_read_key(fitsptr, TDOUBLE, "EXPTIME",  &expdur, NULL, &status);
+		if (status) {// Andor Solis格式
+			status = 0;
+			fits_read_key(fitsptr, TDOUBLE, "EXPOSURE",  &expdur, NULL, &status);
+		}
+		if (!status) {
+			fits_read_key(fitsptr, TINT, "FRAMENO",  &frame->fno, NULL, &status);
+			status = 0;
+		}
+		frame->expdur = expdur;
+		if (!status) {// 不存在关键字的特殊处理
+			fits_read_key(fitsptr, TSTRING, "GROUP_ID", temp, NULL, &status);
+			frame->gid = temp;
+			fits_read_key(fitsptr, TSTRING, "UNIT_ID", temp, NULL, &status);
+			frame->uid = temp;
+			fits_read_key(fitsptr, TSTRING, "CAM_ID", temp, NULL, &status);
+			frame->cid = temp;
+
+			fits_read_key(fitsptr, TDOUBLE, "OBJCTRA",  &frame->raobj,  NULL, &status);
+			fits_read_key(fitsptr, TDOUBLE, "OBJCTDEC", &frame->decobj, NULL, &status);
+
+			status = 0;
+		}
+		fits_close_file(fitsptr, &status);
+
+		if (!status) {
+			path filepath(frame->filepath);
+			char tmfull[40];
+
+			frame->filename = filepath.filename().string();
+			if (!datefull) sprintf(tmfull, "%sT%s", dateobs, timeobs);
+			frame->tmobs = datefull ? dateobs : tmfull;
+			ptime tmobs  = from_iso_extended_string(frame->tmobs);
+			// QHY CMOS 4040的两个时标(毫秒)
+			// 300: 曝光指令执行延迟
+			// 125: 读出时间延迟
+			ptime tmmid  = tmobs + millisec(int(expdur * 500.0) + 300);
+			frame->tmmid = to_iso_extended_string(tmmid);
+			frame->secofday = tmmid.time_of_day().total_milliseconds() / 86400000.0;
+			frame->mjd      = tmmid.date().modjulian_day() + frame->secofday;
+
+			if (frame->gid.empty() || frame->uid.empty() || frame->cid.empty()) {
+				_gLog->Write(LOG_FAULT, NULL, "File[%s] doesn't give right IDs[%s:%s:%s]",
+						frame->filename.c_str(),
+						frame->gid.c_str(), frame->uid.c_str(), frame->cid.c_str());
+				status = -1;
+			}
+		}
+		return (status == 0);
 	}
-	return (status == 0);
+	catch(...) {// 尝试捕获异常: 文件可能为空
+		return false;
+	}
 }
 
 DoProcess::FindPVPtr DoProcess::get_finder(FramePtr frame) {

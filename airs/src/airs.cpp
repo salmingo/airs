@@ -24,6 +24,7 @@
 #include <algorithm>
 #include <boost/make_shared.hpp>
 #include <boost/filesystem.hpp>
+#include <boost/bind/bind.hpp>
 #include "globaldef.h"
 #include "Parameter.h"
 #include "daemon.h"
@@ -33,6 +34,7 @@
 using namespace std;
 using namespace boost::posix_time;
 using namespace boost::filesystem;
+using namespace boost::placeholders;
 
 typedef vector<string> vecstr;
 boost::shared_ptr<GLog> _gLog;
@@ -60,7 +62,7 @@ void process_directory(const string &filepath) {
 			files.push_back(x->path().string());
 		}
 	}
-	if ((n = files.size()) > MINFRAME) {
+	if ((n = files.size())) {
 		// 等待其它处理完成
 		while (_nProcess) boost::this_thread::sleep_for(boost::chrono::seconds(30));
 
@@ -156,7 +158,7 @@ int main(int argc, char **argv) {
 			else if (is_regular_file(pathname) && pathname.extension().string().rfind(".fit") != string::npos)
 				files.push_back(argv[i]);
 		}
-		if ((n = files.size()) > MINFRAME) {
+		if ((n = files.size())) {
 			while(_nProcess) boost::this_thread::sleep_for(boost::chrono::seconds(30));
 			++_nProcess;
 			sort(files.begin(), files.end(), [](const string &name1, const string &name2) {

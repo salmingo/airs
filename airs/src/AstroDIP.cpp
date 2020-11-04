@@ -90,10 +90,10 @@ void AstroDIP::load_catalog() {
 				filemntr_.c_str());
 	}
 	else {
-		if (x1 < 0) x1 = 0;
-		if (x2 > frame_->wimg) x2 = frame_->wimg;
-		if (y1 < 0) y1 = 0;
-		if (y2 > frame_->himg) y2 = frame_->himg;
+		if (x1 < 20) x1 = 20;
+		if (x2 > (frame_->wimg - 20)) x2 = frame_->wimg - 20;
+		if (y1 < 20) y1 = 20;
+		if (y2 > (frame_->himg)) y2 = frame_->himg - 20;
 		/*
 		 * 行信息构成:
 		 * 1. 注释行: 以#为第一个字符
