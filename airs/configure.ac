@@ -52,6 +52,20 @@ esac],
 
 AM_CONDITIONAL(DEBUG, test x"$debug" = x"true")
 
+# Enable HR site
+AC_ARG_ENABLE(huairou,
+AS_HELP_STRING([--enable-huairou],
+               [enable huairou site, default: no]),
+[case "${enableval}" in
+             yes) huairou=true ;;
+             no)  huairou=false ;;
+             *)   AC_MSG_ERROR([bad value ${enableval} for --enable-huairou]) ;;
+esac],
+[huairou=false])
+
+AM_CONDITIONAL(HRSITE, test x"$huairou" = x"true")
+
+
 AC_CHECK_HEADERS([fcntl.h syslog.h unistd.h])
 AC_CHECK_FUNCS([ftruncate mkdir memset pow sqrt strstr bzero strcasecmp strpbrk])
 AC_CHECK_HEADER_STDBOOL

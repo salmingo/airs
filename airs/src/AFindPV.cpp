@@ -395,6 +395,11 @@ void AFindPV::create_dir(FramePtr frame) {
 		utcdate_ = to_iso_string(tmmid.date());
 		filepath /= utcdate_;
 		if (!exists(filepath, ec)) create_directory(filepath, ec);
+#ifdef SITE_HR
+		/* HR系统: 加一层目录: CID */
+		filepath /= cid_;
+		if (!exists(filepath, ec)) create_directory(filepath, ec);
+#endif
 		if (!ec) dirname_ = filepath.string();
 		// GTW输出
 		path pathgtw(param_->pathOutput);
@@ -402,6 +407,11 @@ void AFindPV::create_dir(FramePtr frame) {
 		if (!exists(pathgtw, ec)) create_directory(pathgtw, ec);
 		pathgtw /= utcdate_;
 		if (!exists(pathgtw, ec)) create_directory(pathgtw, ec);
+#ifdef SITE_HR
+		/* HR系统: 加一层目录: CID */
+		pathgtw /= cid_;
+		if (!exists(pathgtw, ec)) create_directory(pathgtw, ec);
+#endif
 		if (!ec) dirgtw_ = pathgtw.string();
 		// 重置可疑像元空间
 		doubtPixSet_.reset();

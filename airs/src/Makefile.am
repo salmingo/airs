@@ -12,6 +12,11 @@ else
   AM_CXXFLAGS = -O3 -Wall
 endif
 
+if HRSITE
+	AM_CFLAGS += SITE_HR
+	AM_CXXFLAGS += SITE_HR
+endif
+
 airs_LDFLAGS = -L/usr/local/lib
 BOOST_LIBS = -lboost_system -lboost_date_time -lboost_filesystem -lboost_chrono
 airs_LDADD = ${BOOST_LIBS} -lm -lpthread -lcurl -lcfitsio 

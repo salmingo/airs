@@ -625,6 +625,8 @@ LIBOBJS
 EGREP
 GREP
 CPP
+HRSITE_FALSE
+HRSITE_TRUE
 DEBUG_FALSE
 DEBUG_TRUE
 OSX_FALSE
@@ -739,6 +741,7 @@ enable_option_checking
 enable_silent_rules
 enable_dependency_tracking
 enable_debug
+enable_huairou
 '
       ac_precious_vars='build_alias
 host_alias
@@ -1378,6 +1381,7 @@ Optional Features:
   --disable-dependency-tracking
                           speeds up one-time build
   --enable-debug          enable debugging, default: no
+  --enable-huairou        enable huairou site, default: no
 
 Some influential environment variables:
   CXX         C++ compiler command
@@ -4535,6 +4539,29 @@ else
 fi
 
 
+# Enable HR site
+# Check whether --enable-huairou was given.
+if test "${enable_huairou+set}" = set; then :
+  enableval=$enable_huairou; case "${enableval}" in
+             yes) huairou=true ;;
+             no)  huairou=false ;;
+             *)   as_fn_error $? "bad value ${enableval} for --enable-huairou" "$LINENO" 5 ;;
+esac
+else
+  huairou=false
+fi
+
+
+ if test x"$huairou" = x"true"; then
+  HRSITE_TRUE=
+  HRSITE_FALSE='#'
+else
+  HRSITE_TRUE='#'
+  HRSITE_FALSE=
+fi
+
+
+
 
 ac_ext=c
 ac_cpp='$CPP $CPPFLAGS'
@@ -5653,6 +5680,10 @@ Usually this means the macro was only invoked conditionally." "$LINENO" 5
 fi
 if test -z "${DEBUG_TRUE}" && test -z "${DEBUG_FALSE}"; then
   as_fn_error $? "conditional \"DEBUG\" was never defined.
+Usually this means the macro was only invoked conditionally." "$LINENO" 5
+fi
+if test -z "${HRSITE_TRUE}" && test -z "${HRSITE_FALSE}"; then
+  as_fn_error $? "conditional \"HRSITE\" was never defined.
 Usually this means the macro was only invoked conditionally." "$LINENO" 5
 fi
 

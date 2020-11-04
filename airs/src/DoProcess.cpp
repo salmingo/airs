@@ -107,6 +107,20 @@ void DoProcess::ImageReductResult(bool rslt) {
 
 void DoProcess::AstrometryResult(int rslt) {
 	FramePtr frame = astro_->GetFrame();
+	if (rslt && valid_ra(frame->raobj) && valid_dec(frame->decobj) && tcpc_gc_.unique()) {
+		apguide proto = boost::make_shared<ascii_proto_guide>();
+		proto->gid = frame->gid;
+		proto->uid = frame->uid;
+		proto->cid = frame->cid;
+		proto->ra  = frame->rac;
+		proto->dec = frame->decc;
+		proto->objra = frame->raobj;
+		proto->objdec = frame->decobj;
+
+		int n;
+		const char *s = ascproto_->CompactGuide(proto, n);
+		tcpc_gc_->Write(s, n);
+	}
 	if (rslt && param_.doPhotometry) {// 匹配星表
 		mutex_lock lck(mtx_frm_match_);
 		queMatch_.push_back(frame);

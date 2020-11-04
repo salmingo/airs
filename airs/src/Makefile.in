@@ -687,6 +687,9 @@ uninstall-am: uninstall-binPROGRAMS
 .PRECIOUS: Makefile
 
 
+@HRSITE_TRUE@	AM_CFLAGS += SITE_HR
+@HRSITE_TRUE@	AM_CXXFLAGS += SITE_HR
+
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.
 .NOEXPORT:
