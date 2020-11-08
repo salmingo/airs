@@ -69,13 +69,12 @@ bool AstroMetry::start_process() {
 		return false;
 	}
 	boost::format fmt1("%d"), fmt2("%.1f");
-	/*
-	execl(param_->pathAstrometry.c_str(), "solve-field", "--use-sextractor",
-	"-p", "-K", "-J",
-	"-L", (fmt2 % param_->scale_low).str().c_str(), "-H", (fmt2 % param_->scale_high).str().c_str(),
-	"-u", "app",
-	frame_->filepath.c_str(), NULL);
-	 */
+//	execl(param_->pathAstrometry.c_str(), "solve-field", "--use-sextractor",
+//	"-p", "-K", "-J",
+//	"-L", (fmt2 % param_->scale_low).str().c_str(), "-H", (fmt2 % param_->scale_high).str().c_str(),
+//	"-u", "app",
+//	frame_->filepath.c_str(), NULL);
+
 	execl(param_->pathAstrometry.c_str(), "solve-field", "--use-source-extractor",
 		"-p", "-K", "-J",
 		"-L", (fmt2 % param_->scale_low).str().c_str(), "-H", (fmt2 % param_->scale_high).str().c_str(),

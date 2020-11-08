@@ -1,26 +1,26 @@
 <?xml version="1.0" encoding="utf-8"?>
 <version>0.1</version>
-<date>20200901T005415</date>
+<date>20201105T150912</date>
 <GeoSite Name="HN">
     <Location Lon="111.714" Lat="16.450800000000001" Alt="10" Timezone="8"/>
 </GeoSite>
-<Output Path="/Users/lxm/Data/output"/>
-<BadMark Path="/usr/local/etc/badmark_airs.xml" />
-<Work Path="/Users/lxm/Data/Temp"/>
+<Output Path="/data"/>
+<BadMark Path="/usr/local/etc/badmark_airs.xml"/>
+<Work Path="/dev/shm"/>
 <SampleWindow Size="512"/>
 <Reduction PathExe="/usr/local/bin/sex" PathConfig="/usr/local/etc/sex-param/default.sex"/>
-<Astrometry Enable="true" PathExe="/usr/local/bin/solve-field">
+<Astrometry Enable="false" PathExe="/usr/local/bin/solve-field">
     <PixelScale Low="8.3" High="8.5"/>
 </Astrometry>
-<Photometry Enable="true">
+<Photometry Enable="false">
     <Catalog Path="/Users/lxm/Catalogue/UCAC4"/>
 </Photometry>
 <Database Enable="false">
-    <URL Addr="http://172.28.8.8:8080/gwebend/"/>
+    <URL Addr="http://192.168.10.20:8080/gwebend/"/>
 </Database>
 <GeneralControl Enable="false">
-    <Host IPv4="127.0.0.1" Port="4010"/>
+    <Host IPv4="192.168.10.20" Port="4010"/>
 </GeneralControl>
-<FileServer Enable="false">
+<FileServer Enable="true">
     <Host IPv4="127.0.0.1" Port="4021"/>
 </FileServer>

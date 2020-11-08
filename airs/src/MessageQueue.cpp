@@ -4,10 +4,12 @@
  * @date 2017-10-02
  */
 
-#include <boost/bind.hpp>
+#include <boost/bind/bind.hpp>
 #include <boost/make_shared.hpp>
 #include "MessageQueue.h"
 #include "GLog.h"
+
+using namespace boost::placeholders;
 
 #define MQFUNC_SIZE		1024
 

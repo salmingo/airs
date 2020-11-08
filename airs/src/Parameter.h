@@ -172,11 +172,11 @@ public:
 
 		ptree& pt4 = pt.add("Database", "");
 		pt4.add("<xmlattr>.Enable",    false);
-		pt4.add("URL.<xmlattr>.Addr",  "http://172.28.8.8:8080/gwebend/");
+		pt4.add("URL.<xmlattr>.Addr",  "http://192.168.10.20:8080/gwebend/");
 
 		ptree& pt5 = pt.add("GeneralControl", "");
 		pt5.add("<xmlattr>.Enable",    false);
-		pt5.add("Host.<xmlattr>.IPv4",  "127.0.0.1");
+		pt5.add("Host.<xmlattr>.IPv4",  "192.168.10.20");
 		pt5.add("Host.<xmlattr>.Port",  4010);
 		// 文件服务器
 		ptree& pt6 = pt.add("FileServer", "");

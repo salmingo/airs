@@ -110,6 +110,8 @@ void AstroDIP::load_catalog() {
 			}
 			features = body->features;
 			if (pos == NDX_MAX
+					&& features[NDX_X] > x1 && features[NDX_X] < x2
+					&& features[NDX_Y] > y1 && features[NDX_Y] < y2
 					&& features[NDX_FLUX] > 1.0
 					&& features[NDX_FWHM] > 0.5
 					&& features[NDX_BACK] < 50000.0) {
@@ -119,8 +121,7 @@ void AstroDIP::load_catalog() {
 				 * - 圆形度小于0.2
 				 * - 在中心区域内
 				 */
-				if (features[NDX_ELLIP] < 0.1 && features[NDX_X] >= x1 && features[NDX_X] < x2
-						&& features[NDX_Y] >= y1 && features[NDX_Y] < y2)
+				if (features[NDX_ELLIP] < 0.1)
 					buff.push_back(features[NDX_FWHM]);
 			}
 		}

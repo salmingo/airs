@@ -6,8 +6,10 @@
   */
 
 #include <boost/make_shared.hpp>
-#include <boost/bind.hpp>
+#include <boost/bind/bind.hpp>
 #include "IOServiceKeep.h"
+
+using namespace boost::placeholders;
 
 IOServiceKeep::IOServiceKeep() {
 	work_.reset(new work(ios_));
