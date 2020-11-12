@@ -116,12 +116,12 @@ void AFindPV::end_frame() {
 /*
  * 从相邻帧中识别未标记的恒星
  */
-void AFindPV::cross_match() {
-	if (!frmprev_.unique()) return;
+bool AFindPV::cross_match() {
+	if (!frmprev_.unique()) return false;
 	PvPtVec &prev = frmprev_->pts;
 	PvPtVec &now  = frmnow_->pts;
 	double dx, dy, ra, dc;
-	int n0(0), n2(0);
+	int n0(0), n2(0), n(prev.size() * 0.3);
 
 	for (PvPtVec::iterator it1 = prev.begin(); it1 != prev.end(); ++it1) {
 		if ((*it1)->matched) continue;
@@ -134,8 +134,8 @@ void AFindPV::cross_match() {
 			dy = fabs((*it2)->dc - dc);
 			dx = fabs((*it2)->ra - ra);
 			if (dx > 180.0) dx = 360.0 - dx;
-			if (dx <= DEG5AS && dy <= DEG5AS) {
-//			if (dx < DEG10AS && dy < DEG5AS) {
+//			if (dx <= DEG5AS && dy <= DEG5AS) {
+			if (dx < DEG10AS && dy < DEG10AS) {
 				(*it1)->matched = 2;
 				(*it2)->matched = 2;
 				++n2;
@@ -151,6 +151,7 @@ void AFindPV::cross_match() {
 		_gLog->Write("Points<%s>: non-matched %d of %d", prev[0]->filename.c_str(),
 				n0 - n2, prev.size());
 	}
+	return (n0 != n2 && (n0 - n2) <= n);
 }
 
 void AFindPV::correct_annual_aberration(PvPtPtr pt) {
@@ -362,8 +363,8 @@ void AFindPV::candidate2object(PvCanPtr can) {
 		row = int((ymin + ymax) * 0.5 + 0.5);
 		noise = test_badcol(col);	// 坏列
 		if (!noise && (ymax - ymin) <= 2.0 && ysig < 1.0) {// 热点?
-//			noise = test_badpix(col, row);
 			doubtable = true;
+//			noise = true;
 		}
 	}
 	/*------------------------------------------------------------*/
@@ -672,8 +673,8 @@ void AFindPV::thread_newframe() {
 			remove_badpix(frame);
 			upload_ot(frame);
 			new_frame(frame);
-			cross_match();
-			end_frame();
+			if (cross_match())
+				end_frame();
 		}
 	}
 }

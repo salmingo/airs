@@ -27,6 +27,8 @@
 // 5"=1.388889E-3°
 #define DEG5AS		1.388889E-3
 #define DEG10AS		2.777778E-3
+#define DEG20AS		5.555556E-3
+#define DEG30AS		8.333333E-3
 #define MINFRAME	5	//< 有效数据最少帧数
 #define INTFRAME	5	//< 数据点间最大帧间隔
 #define BADCNT		5	//< 坏点/列次数判定阈值
@@ -135,7 +137,8 @@ public:
 		dx = fabs(pt->ra - x);
 		dy = fabs(pt->dc - y);
 		if (dx > 180.0) dx = 360.0 - dx;
-		return (dx < DEG10AS && dy < DEG10AS);
+//		return (dx < DEG20AS && dy < DEG20AS);
+		return (dx < DEG30AS && dy < DEG30AS);
 	}
 
 	/*!
@@ -199,18 +202,19 @@ public:
 		if (n < MINFRAME) return false;	// 有效数据长度>=5
 
 		bool valid(true);
-		double xrate, yrate;
-		int xsgn, ysgn;
+		double rrate, drate;
+		int rsgn, dsgn;
 
-		move_speed(pts[0], last_point(), &xrate, &yrate);
-		xsgn = sign_rate(xrate);
-		ysgn = sign_rate(yrate);
-		valid = xsgn || ysgn;
+		move_speed(pts[0], last_point(), &rrate, &drate);
+		rsgn = sign_rate(rrate);
+		dsgn = sign_rate(drate);
+		valid = rsgn || dsgn;
+
 		if (valid) {// 规避: 恒星交叉判定失败. 2019-11-16一个数据避开该判定
 			// 检测速度方向一致性
 			for (i = 2; i < n && valid; ++i) {
-				move_speed(pts[i - 1], pts[i], &xrate, &yrate);
-				valid = sign_rate(xrate) == xsgn && sign_rate(yrate) == ysgn;
+				move_speed(pts[i - 1], pts[i], &rrate, &drate);
+				valid = sign_rate(rrate) == rsgn && sign_rate(drate) == dsgn;
 			}
 			if (!valid) {
 				for (i = 2; i < n; ++i) pts[i]->dec_rel();
@@ -452,8 +456,11 @@ protected:
 	void correct_annual_aberration(PvPtPtr pt);
 	/*!
 	 * @brief 交叉匹配相邻帧, 判定其中的恒星
+	 * @return
+	 * 匹配结果
+	 * - 无未匹配目标或未匹配目标数量大于10%, 则返回false
 	 */
-	void cross_match();
+	bool cross_match();
 	/*!
 	 * @brief 建立新的候选体
 	 */

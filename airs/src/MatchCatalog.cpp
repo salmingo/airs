@@ -4,13 +4,15 @@
  * @date 2020-07-23
  */
 
+#include <boost/make_shared.hpp>
+#include <boost/date_time/posix_time/posix_time.hpp>
+#include <boost/filesystem.hpp>
 #include "MatchCatalog.h"
 #include "ADefine.h"
 #include "GLog.h"
-#include <boost/make_shared.hpp>
-#include <boost/date_time/posix_time/posix_time.hpp>
 
 using namespace boost::posix_time;
+using namespace boost::filesystem;
 using namespace AstroUtil;
 
 MatchCatalog::MatchCatalog(Parameter *param) {
@@ -56,6 +58,7 @@ void MatchCatalog::thread_process() {
 	 * astrometry.net生成WCS时的xy与SEx生成的xy存在偏差, 标准差与0.7pixel.
 	 * 使用2.5/0.7≈3.6x作为匹配阈值, 将尽可能多的参考星加入拟合
 	 */
+/*
 	match_ucac4(2.5 * frame_->scale);
 	// TNX拟合
 	refstar_from_frame();
@@ -67,30 +70,52 @@ void MatchCatalog::thread_process() {
 		if (!wcstnx_.ProcessFit()) {
 			// 使用TNX拟合结果匹配星表, 匹配半径: 4x sigma
 			rd_from_tnx();
-			match_ucac4(4. * model_.errfit);
+			match_ucac4(4. * model_.errfit, false);
 			calc_center();
 			success = true;
 		}
 	}
-
+*/
+	match_ucac4(2.5 * frame_->scale);
+	refstar_from_frame();
+	if (!wcstnx_.ProcessFit()) {
+		rd_from_tnx();
+		match_ucac4(4. * model_.errfit, false);
+		calc_center();
+		success = true;
+	}
 	// 结束
 	working_ = false;
 	rsltMatch_(success);
 }
 
-void MatchCatalog::match_ucac4(double r) {
+void MatchCatalog::match_ucac4(double r, bool fit) {
 	NFObjVec &nfobj = frame_->nfobjs;
 	ucac4item_ptr starptr;
 	int n(0), nfound, i, j;
 	double ra, dc, er, ed;
 	double emin, t1, t2, cosd;
+	FILE *fp = NULL;
+	double ermin(1E30), ermax(-1E30), edmin(1E30), edmax(-1E30);
+	if (!fit) {
+		path filepath(frame_->filepath);
+		filepath.replace_extension(".txt");
+		fp = fopen(filepath.c_str(), "w");
+	}
 
 	r /= 60.;	// 搜索半径, 量纲=>角分
 	for (NFObjVec::iterator x = nfobj.begin(); x != nfobj.end(); ++x) {
+		if (fit && (*x)->features[NDX_ELLIP] >= 0.3) continue;
 		(*x)->matched = 0;
 		ra = (*x)->ra_fit;
 		dc = (*x)->dec_fit;
 		cosd = cos(dc * D2R);
+
+		if (fp) {
+			fprintf (fp, "%6.1f  %6.1f  %9.5f  %9.5f  ",
+					(*x)->features[NDX_X], (*x)->features[NDX_Y],
+					ra, dc);
+		}
 
 		if ((nfound = ucac4_.FindStar(ra, dc, r))) {
 			starptr = ucac4_.GetResult();
@@ -116,9 +141,29 @@ void MatchCatalog::match_ucac4(double r) {
 			(*x)->mag_cat  = starptr[j].apasm[1] * 0.001;	// V波段
 			(*x)->matched  = 1;
 			++n;
+
+			if (fp) {
+				er = ((*x)->ra_fit - (*x)->ra_cat) * 3600.0;
+				ed = ((*x)->dec_fit - (*x)->dec_cat) * 3600.0;
+				if (er < ermin) ermin = er;
+				if (er > ermax) ermax = er;
+				if (ed < edmin) edmin = ed;
+				if (ed > edmax) edmax = ed;
+				fprintf (fp, "%9.5f  %9.5f  %5.1f  %5.1f",
+						(*x)->ra_cat, (*x)->dec_cat,
+						er, ed);
+			}
+		}
+		if (fp) {
+			fprintf (fp, "\n");
 		}
 	}
 	frame_->notOt = n;
+	if (fp) {
+		fprintf (fp, "\n\n%5.1f  %5.1f  %5.1f  %5.1f\n",
+				ermin, ermax, edmin, edmax);
+		fclose(fp);
+	}
 }
 
 void MatchCatalog::refstar_from_frame() {

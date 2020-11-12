@@ -549,42 +549,108 @@ int WCSTNX::ProcessFit() {
 	// 选择最接近参考点的参考星作为投影中心. (refx, refy)保存输入值
 	find_nearest(model_->ref_pixx, model_->ref_pixy, model_->ref_wcsx, model_->ref_wcsy);
 	if (!try_fit()) return 2;
-	if (!(xauto && yauto)) {// 使用新的参考点重新拟合模型
-		double x, y, refr, refd;
-		x = xauto ? model_->ref_pixx : refx;
-		y = yauto ? model_->ref_pixy : refy;
-		model_->Image2WCS(x, y, refr, refd);
-		model_->ref_pixx = x;
-		model_->ref_pixy = y;
-		model_->ref_wcsx = refr;
-		model_->ref_wcsy = refd;
-		try_fit();
+	calc_residual();
+
+	// 迭代
+	bool success(true);
+	int i(0), n0(stars_.size() * 0.6), n(stars_.size());
+	int itmax(5);	// 迭代最大次数
+	double err0(1.5E-5);	// 迭代中止判据
+
+	while (success && n > n0 && model_->errfit >err0 && ++i < itmax) {
+		sig_clip();
+		n = stars_.size();
+		if ((success = try_fit()))
+			calc_residual();
 	}
-	// 计算拟合结果
+
+	// 基于设定参考点重新拟合
+	if (success) {
+		if (!(xauto && yauto)) {// 使用新的参考点重新拟合模型
+			double x, y, refr, refd;
+			x = xauto ? model_->ref_pixx : refx;
+			y = yauto ? model_->ref_pixy : refy;
+			model_->Image2WCS(x, y, refr, refd);
+			model_->ref_pixx = x;
+			model_->ref_pixy = y;
+			model_->ref_wcsx = refr;
+			model_->ref_wcsy = refd;
+			try_fit();
+			calc_residual();
+		}
+		calc_suppl();
+		model_->errfit *= R2AS;
+
+#ifdef NDEBUG
+	int j;
+	int nitem = model_->res[0].nitem;
+	printf ("CD Matrix:\n");
+	for (i = 0; i < 2; ++i) {
+		for (j = 0; j < 2; ++j)
+			printf ("\t%12.10f\t", model_->cd[i][j]);
+		printf ("\n");
+	}
+	printf ("\n");
+
+	printf ("%-21s\t%-21s\n", "    coef 1", "    coef 2");
+	for (i = 0; i < nitem; ++i) {
+		printf ("\t%13.10f\t%13.10f\n",
+				res[0].coef[i], res[1].coef[i]);
+	}
+	printf ("\n");
+#endif
+
+		return 0;
+	}
+
+	return 2;
+}
+
+// 剔除大偏差样本, 剔除阈值: 3σ
+void WCSTNX::sig_clip() {
+	if (model_->errfit > 0.0) {
+		double l0(model_->errfit * 3.0);
+
+#ifdef NDEBUG
+	printf ("sample count before 3xσ clip: %lu\n", stars_.size());
+#endif
+		for (MatStarVec::iterator it = stars_.begin(); it != stars_.end(); ) {
+			if (fabs((*it).errbias) > l0) it = stars_.erase(it);
+			else ++it;
+		}
+#ifdef NDEBUG
+		printf ("sample count after 3xσ clip: %lu\n", stars_.size());
+#endif
+	}
+}
+
+void WCSTNX::calc_suppl() {
 	AMath math;
-	// 计算逆旋转矩阵
+	// 逆旋转矩阵
 	memcpy(&model_->ccd[0][0], &model_->cd[0][0], sizeof(model_->ccd));
 	math.MatrixInvert(2, &model_->ccd[0][0]);
-	// 计算倾角
+	// 倾角
 	model_->rotation = atan2(model_->cd[0][1], model_->cd[0][0]) * R2D;
-	// 计算像元比例尺
+	// 像元比例尺
 	double tmp[2][2];
 	memcpy(&tmp[0][0], &model_->cd[0][0], sizeof(model_->ccd));
 	model_->scale = D2AS * sqrt(math.LUDet(2, &tmp[0][0]));
-	// 计算拟合残差
+}
+
+// 统计残差
+void WCSTNX::calc_residual() {
 	double esum(0.0), esq(0.0);
 	int i, n(stars_.size());
 	double ra, dc, t;
 
 	for (i = 0; i < n; ++i) {
 		model_->Image2WCS(stars_[i].x, stars_[i].y, ra, dc);
-		t = SphereRange(ra, dc, stars_[i].ra * D2R, stars_[i].dc * D2R);
+		stars_[i].errbias = t = SphereRange(ra, dc, stars_[i].ra * D2R, stars_[i].dc * D2R);
 		esum += t;
 		esq  += (t * t);
 	}
-	model_->errfit = sqrt((esq - esum * esum / n) / n) * R2AS;
-
-	return 0;
+	t = (esq - esum * esum / n) / n;
+	model_->errfit = t > 0.0 ? sqrt(t) : 0.0; // 截断误差
 }
 
 void WCSTNX::find_nearest(double &refx, double &refy, double &refr, double &refd) {

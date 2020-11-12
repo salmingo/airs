@@ -30,6 +30,7 @@ struct MatchedStar {
 	double ra, dc;	/// RA/DEC坐标, 量纲: 角度
 	/* 拟合结果 */
 	double ra_fit, dc_fit;	/// RA/DEC坐标, 量纲: 角度
+	double errbias;			///< 偏差: 拟合-样本, 量纲: 角度
 };
 typedef std::vector<MatchedStar> MatStarVec;
 
@@ -346,6 +347,20 @@ protected:
 	 * 模型拟合结果
 	 */
 	bool try_fit();
+	/*!
+	 * @brief 剔除偏差大于3σ的样本
+	 */
+	void sig_clip();
+	/*!
+	 * @brief 依据拟合结果, 计算补充参数
+	 */
+	void calc_suppl();
+	/*!
+	 * @brief 计算拟合残差
+	 * @note
+	 * - 残差此时量纲: 弧度
+	 */
+	void calc_residual();
 };
 //////////////////////////////////////////////////////////////////////////////
 } /* namespace AstroUtil */

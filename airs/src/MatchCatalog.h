@@ -71,9 +71,12 @@ protected:
 	void thread_process();
 	/*!
 	 * @brief 使用拟合坐标, 建立与UCAC4星表的匹配关系
-	 * @param r  匹配半径, 量纲: 角秒
+	 * @param r    匹配半径, 量纲: 角秒
+	 * @param fit  匹配结果用于拟合
+	 * @note
+	 * 当fit==true时, 对圆形度限定0.3
 	 */
-	void match_ucac4(double r);
+	void match_ucac4(double r, bool fit = true);
 	/*!
 	 * @brief 从恒星匹配结果构建参考星
 	 */

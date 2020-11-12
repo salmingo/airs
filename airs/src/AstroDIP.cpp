@@ -90,10 +90,13 @@ void AstroDIP::load_catalog() {
 				filemntr_.c_str());
 	}
 	else {
-		if (x1 < 20) x1 = 20;
-		if (x2 > (frame_->wimg - 20)) x2 = frame_->wimg - 20;
-		if (y1 < 20) y1 = 20;
-		if (y2 > (frame_->himg)) y2 = frame_->himg - 20;
+		if (x1 < 10) x1 = 10;
+		if (x2 > (frame_->wimg - 10)) x2 = frame_->wimg - 10;
+		if (y1 < 10) y1 = 10;
+		if (y2 > (frame_->himg)) y2 = frame_->himg - 10;
+		double xmin(10), xmax(frame_->wimg - 10);
+		double ymin(10), ymax(frame_->himg - 10);
+		double x, y;
 		/*
 		 * 行信息构成:
 		 * 1. 注释行: 以#为第一个字符
@@ -109,19 +112,23 @@ void AstroDIP::load_catalog() {
 				*features = atof(token);
 			}
 			features = body->features;
+			x = features[NDX_X];
+			y = features[NDX_Y];
 			if (pos == NDX_MAX
-					&& features[NDX_X] > x1 && features[NDX_X] < x2
-					&& features[NDX_Y] > y1 && features[NDX_Y] < y2
+					&& x >= xmin && x <= xmax
+					&& y >= ymin && y <= ymax
 					&& features[NDX_FLUX] > 1.0
 					&& features[NDX_FWHM] > 0.5
-					&& features[NDX_BACK] < 50000.0) {
+					&& features[NDX_BACK] < 22000.0) {
 				nfobjs.push_back(body);
 				/*
 				 * 参与统计FWHM条件:
 				 * - 圆形度小于0.2
 				 * - 在中心区域内
 				 */
-				if (features[NDX_ELLIP] < 0.1)
+				if (features[NDX_ELLIP] < 0.1
+						&& x > x1 && x < x2
+						&& y > y1 && y < y2)
 					buff.push_back(features[NDX_FWHM]);
 			}
 		}
@@ -157,6 +164,6 @@ void AstroDIP::thread_monitor() {
 	 * @note 2019-11-23
 	 * 判定: 有效目标数量不得少于100
 	 */
-	success = frame_->nfobjs.size() > 100;
+	success = frame_->nfobjs.size() > 20;
 	rsltReduct_(success);
 }
