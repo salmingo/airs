@@ -121,7 +121,7 @@ bool AFindPV::cross_match() {
 	PvPtVec &prev = frmprev_->pts;
 	PvPtVec &now  = frmnow_->pts;
 	double dx, dy, ra, dc;
-	int n0(0), n2(0), n(prev.size() * 0.3);
+	int n0(0), n2(0);
 
 	for (PvPtVec::iterator it1 = prev.begin(); it1 != prev.end(); ++it1) {
 		if ((*it1)->matched) continue;
@@ -134,7 +134,6 @@ bool AFindPV::cross_match() {
 			dy = fabs((*it2)->dc - dc);
 			dx = fabs((*it2)->ra - ra);
 			if (dx > 180.0) dx = 360.0 - dx;
-//			if (dx <= DEG5AS && dy <= DEG5AS) {
 			if (dx < DEG10AS && dy < DEG10AS) {
 				(*it1)->matched = 2;
 				(*it2)->matched = 2;
@@ -151,7 +150,7 @@ bool AFindPV::cross_match() {
 		_gLog->Write("Points<%s>: non-matched %d of %d", prev[0]->filename.c_str(),
 				n0 - n2, prev.size());
 	}
-	return (n0 != n2 && (n0 - n2) <= n);
+	return (n0 != n2);
 }
 
 void AFindPV::correct_annual_aberration(PvPtPtr pt) {

@@ -12,6 +12,11 @@ else
   AM_CXXFLAGS = -O3 -Wall
 endif
 
+if LINUX
+	AM_CFLAGS += -DLINUX
+	AM_CXXFLAGS += -DLINUX
+endif
+
 if HRSITE
 	AM_CFLAGS += SITE_HR
 	AM_CXXFLAGS += SITE_HR

@@ -100,17 +100,17 @@ public:
 } PvFrame;
 typedef boost::shared_ptr<PvFrame> PvFrmPtr;
 
-/*
+/*!
  * pv_candidate使用流程:
  * 1. 构建对象
  * 2. xy_expect(): 评估输出的xy与数据点之间的偏差是否符合阈值
  * 3. add_point(): 将数据点加入候选体
  * 4. recheck_frame(): 在EndFrame()中评估当前帧数据点是否为候选体提供有效数据
  */
-typedef struct pv_candidate {// 候选体
-	PvPtVec pts;	//< 已确定数据点集合
-	PvPtVec frmu;	//< 由当前帧加入的不确定数据点
-	double xs, ys;	//< RA/DEC变化速度
+typedef struct pv_candidate {///< 候选体
+	PvPtVec pts;	///< 已确定数据点集合
+	PvPtVec frmu;	///< 由当前帧加入的不确定数据点
+	double rs, ds;	///< RA/DEC变化速度
 
 public:
 	int sign_rate(double rate) {
@@ -123,42 +123,41 @@ public:
 		return pts[pts.size() - 1];
 	}
 
-	void xy_expect(double mjd, double &x, double &y) {
+	void rd_expect(double mjd, double &ra, double &dec) {
 		PvPtPtr last = last_point();
 		double t = mjd - last->mjd;
-		x = fabs(xs) < ASPERDAY ? last->ra : cyclemod(last->ra + xs * t, 360.0);
-		y = fabs(ys) < ASPERDAY ? last->dc : last->dc + ys * t;
+		ra  = fabs(rs) < ASPERDAY ? last->ra : cyclemod(last->ra + rs * t, 360.0);
+		dec = fabs(ds) < ASPERDAY ? last->dc : last->dc + ds * t;
 	}
 
 	bool is_expect(PvPtPtr pt) {
 		PvPtPtr last = last_point();
-		double x, y, dx, dy;
-		xy_expect(pt->mjd, x, y);
-		dx = fabs(pt->ra - x);
-		dy = fabs(pt->dc - y);
-		if (dx > 180.0) dx = 360.0 - dx;
-//		return (dx < DEG20AS && dy < DEG20AS);
-		return (dx < DEG30AS && dy < DEG30AS);
+		double ra, dec, dr, dd;
+		rd_expect(pt->mjd, ra, dec);
+		dr = fabs(pt->ra - ra);
+		dd = fabs(pt->dc - dec);
+		if (dr > 180.0) dr = 360.0 - dr;
+		return (dr < DEG20AS && dd < DEG20AS);
 	}
 
 	/*!
 	 * @brief 计算运动速度
 	 */
-	void move_speed(PvPtPtr pt1, PvPtPtr pt2, double *xrate, double *yrate) {
+	void move_speed(PvPtPtr pt1, PvPtPtr pt2, double *rrate, double *drate) {
 		double t = pt2->mjd - pt1->mjd;
-		double yt = (pt2->dc - pt1->dc) / t;
-		double xt = pt2->ra - pt1->ra;
-		if (xt > 180.0) xt -= 360.0;
-		else if (xt < -180.0) xt += 360.0;
-		xt /= t;
-		if (xrate) *xrate = xt;
-		if (yrate) *yrate = yt;
+		double dt = (pt2->dc - pt1->dc) / t;
+		double rt = pt2->ra - pt1->ra;
+		if (rt > 180.0) rt -= 360.0;
+		else if (rt < -180.0) rt += 360.0;
+		rt /= t;
+		if (rrate) *rrate = rt;
+		if (drate) *drate = dt;
 	}
 
 	void create(PvPtPtr pt1, PvPtPtr pt2) {
 		pts.push_back(pt1);
 		pts.push_back(pt2);
-		move_speed(pt1, pt2, &xs, &ys);
+		move_speed(pt1, pt2, &rs, &ds);
 	}
 
 	/*!
@@ -173,24 +172,24 @@ public:
 		int n(frmu.size());
 		if (n == 1) pt = frmu[0];
 		else if (n > 1) {
-			double x, y, dx, dy, dx2y2, dx2y2min(1E30);
+			double ra, dec, dr, dd, dr2d2, dr2d2min(1E30);
 
-			xy_expect(frmu[0]->mjd, x, y);
+			rd_expect(frmu[0]->mjd, ra, dec);
 			for (int i = 0; i < n; ++i) {
 				if (!frmu[i]->matched) {
-					dx = fabs(frmu[i]->ra - x);
-					dy = fabs(frmu[i]->dc - y);
-					if (dx > 180.0) dx = 360.0 - dx;
-					dx2y2 = dx * dx + dy * dy;
-					if (dx2y2 < dx2y2min) {
-						dx2y2min = dx2y2;
+					dr = fabs(frmu[i]->ra - ra);
+					dd = fabs(frmu[i]->dc - dec);
+					if (dr > 180.0) dr = 360.0 - dr;
+					dr2d2 = dr * dr + dd * dd;
+					if (dr2d2 < dr2d2min) {
+						dr2d2min = dr2d2;
 						pt = frmu[i];
 					}
 				}
 			}
 		}
 		if (pt.use_count()) {
-			move_speed(last_point(), pt, &xs, &ys);
+			move_speed(last_point(), pt, &rs, &ds);
 			pt->inc_rel();
 			pts.push_back(pt);
 			frmu.clear();

@@ -7,7 +7,7 @@
 <Output Path="/data"/>
 <BadMark Path="/usr/local/etc/badmark_airs.xml"/>
 <Work Path="/dev/shm"/>
-<SampleWindow Size="512"/>
+<SampleWindow Size="2048"/>
 <Reduction PathExe="/usr/local/bin/sex" PathConfig="/usr/local/etc/sex-param/default.sex"/>
 <Astrometry Enable="false" PathExe="/usr/local/bin/solve-field">
     <PixelScale Low="8.3" High="8.5"/>

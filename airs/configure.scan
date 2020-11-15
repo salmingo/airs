@@ -8,11 +8,7 @@ AC_CONFIG_HEADERS([config.h])
 
 # Checks for programs.
 AC_PROG_CXX
-AC_PROG_AWK
 AC_PROG_CC
-AC_PROG_INSTALL
-AC_PROG_CPP
-AC_PROG_MKDIR_P
 
 # Checks for libraries.
 # FIXME: Replace `main' with a function in `-lboost_chrono':
@@ -52,7 +48,5 @@ AC_FUNC_FORK
 AC_CHECK_FUNCS([bzero ftruncate memset mkdir pow sqrt strcasecmp strpbrk strstr])
 
 AC_CONFIG_FILES([Makefile
-                 release/Makefile
-                 release/src/Makefile
                  src/Makefile])
 AC_OUTPUT
