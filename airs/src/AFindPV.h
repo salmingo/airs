@@ -30,7 +30,6 @@
 #define DEG20AS		5.555556E-3
 #define DEG30AS		8.333333E-3
 #define MINFRAME	5	//< 有效数据最少帧数
-#define INTFRAME	5	//< 数据点间最大帧间隔
 #define BADCNT		5	//< 坏点/列次数判定阈值
 
 namespace AstroUtil {
@@ -89,6 +88,9 @@ typedef boost::shared_ptr<PvPt> PvPtPtr;
 typedef std::vector<PvPtPtr> PvPtVec;
 
 typedef struct pv_frame {// 单帧数据共性属性及数据点集合
+	double xmin, xmax;	//< 有效区域
+	double ymin, ymax;	//< Y有效区域
+	double mjd;			//< 图像中间时刻对应的修正儒略日
 	double secofday;	//< 曝光中间时刻对应的当日秒数
 	double rac, decc;	//< 视场中心指向, 量纲: 角度
 	PvPtVec pts;	//< 数据点集合
@@ -96,6 +98,10 @@ typedef struct pv_frame {// 单帧数据共性属性及数据点集合
 public:
 	virtual ~pv_frame() {
 		pts.clear();
+	}
+
+	bool InRect(double x, double y) {
+		return (x >= xmin && x <= xmax && y >= ymin && y <= ymax);
 	}
 } PvFrame;
 typedef boost::shared_ptr<PvFrame> PvFrmPtr;
@@ -121,6 +127,18 @@ public:
 
 	PvPtPtr last_point() {// 构成候选体的最后一个数据点
 		return pts[pts.size() - 1];
+	}
+
+	/*!
+	 * @brief 预期XY坐标
+	 * @param mjd 当前时间
+	 * @param x   预期X
+	 * @param y   预期
+	 */
+	void xy_expect(double mjd, double& x, double& y) {
+		double t = (mjd - pts[0]->mjd) / (last_point()->mjd - pts[0]->mjd);
+		x = pts[0]->x + (last_point()->x - pts[0]->x) * t;
+		y = pts[0]->y + (last_point()->y - pts[0]->y) * t;
 	}
 
 	void rd_expect(double mjd, double &ra, double &dec) {
@@ -260,32 +278,6 @@ public:
 };
 typedef std::vector<uncertain_badcol> UncBadcolVec;
 
-struct uncertain_badpix {
-	int row, col;	//< 行列编号
-	int hit;		//< 命中率
-
-public:
-	uncertain_badpix() {
-		row = col = 0;
-		hit = 0;
-	}
-
-	uncertain_badpix(int _row, int _col) {
-		row = _row;
-		col = _col;
-		hit = 1;
-	}
-
-	bool isPixel(int r, int c) {
-		return (row == r && col == c);
-	}
-
-	int inc() {
-		return ++hit;
-	}
-};
-typedef std::vector<uncertain_badpix> UncBadpixVec;
-
 /*!
  * @struct doubt_pixel
  * @brief 可疑的像元
@@ -294,13 +286,11 @@ typedef std::vector<uncertain_badpix> UncBadpixVec;
  */
 struct doubt_pixel {
 	typedef boost::shared_ptr<doubt_pixel> Pointer;
-	typedef std::pair<string, string> objpair;
 
 	int col, row;	///< 坐标
 	int count;		///< 命中率
-	double mjd;		///< 弧端结束时间
+	int fno;		///< 弧端结束帧编号
 
-	std::vector<objpair> pathobj;	///< 上传数据库的文件路径
 	std::vector<string> pathtxt;	///< 本地txt文件路径
 	std::vector<string> pathgtw;	///< 本地gtw文件路径
 
@@ -308,14 +298,14 @@ public:
 	doubt_pixel() {
 		col = row = -1;
 		count = 0;
-		mjd = 0.0;
+		fno = -1;
 	}
 
 	doubt_pixel(int c, int r) {
 		col = c;
 		row = r;
 		count = 0;
-		mjd = 0.0;
+		fno = INT_MAX;
 	}
 
 	static Pointer create() {
@@ -331,25 +321,18 @@ public:
 	}
 
 	bool is_bad() {
-		return count >= 2;
+		return count >= 3;
 	}
 
-	int inc(double mjdb, double mjde) {
-		double t(6.9444444E-4);	// 60s=>day: 60 / 86400
-		if ((mjdb - mjd) > t) ++count;
-		mjd = mjde;
+	int inc(double fnob, double fnoe) {
+		if (fnob < fno) ++count;
+		fno = fnoe;
 		return count;
 	}
 
 	void reset() {
-		pathobj.clear();
 		pathtxt.clear();
 		pathgtw.clear();
-	}
-
-	void addpath_obj(const string& path, const string& objname) {
-		objpair obj(path, objname);
-		pathobj.push_back(obj);
 	}
 
 	void addpath_txt(const string& path) {
@@ -417,7 +400,6 @@ protected:
 	string dirgtw_;		//< GTW格式输出文件的目录名
 	string utcdate_;	//< UTC日期
 	UncBadcolVec uncbadcol_;	//< 不确定的坏列
-//	UncBadpixVec uncbadpix_;	//< 不确定的坏点
 	doubt_pixel_set doubtPixSet_;	//< 可疑的像元集合
 
 	boost::mutex mtx_frmque_;	//< 互斥锁: 图像队列
@@ -483,7 +465,6 @@ protected:
 	 */
 	void candidate2object(PvCanPtr can);
 	bool test_badcol(int col);
-//	bool test_badpix(int col, int row);
 	/*!
 	 * @brief 复核可疑像元数据
 	 * @note

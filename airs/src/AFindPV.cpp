@@ -33,7 +33,6 @@ AFindPV::AFindPV(Parameter *param) {
 AFindPV::~AFindPV() {
 	thrd_newfrm_->interrupt();
 	thrd_newfrm_->join();
-	recheck_doubt();	// 人工时的特殊处理
 }
 
 void AFindPV::SetIDs(const string& gid, const string& uid, const string& cid) {
@@ -67,7 +66,6 @@ void AFindPV::end_sequence() {
 		frmnow_.reset();
 		cans_.clear();
 		uncbadcol_.clear();
-//		uncbadpix_.clear();
 	}
 }
 
@@ -76,6 +74,10 @@ void AFindPV::new_frame(FramePtr frame) {
 	frmprev_  = frmnow_;
 
 	frmnow_   = boost::make_shared<PvFrame>();
+	frmnow_->xmin = frmnow_->ymin = 20.0;
+	frmnow_->xmax = frame->wimg - 20.0;
+	frmnow_->ymax = frame->himg - 20.0;
+	frmnow_->mjd  = frame->mjd;
 	frmnow_->secofday = frame->secofday;
 	frmnow_->rac      = frame->rac;
 	frmnow_->decc     = frame->decc;
@@ -221,9 +223,13 @@ void AFindPV::append_candidates() {
 }
 
 void AFindPV::recheck_candidates() {
+	double mjd = frmnow_->mjd;
+	double x, y;
+
 	for (PvCanVec::iterator it = cans_.begin(); it != cans_.end();) {
-		if ((last_fno_ - (*it)->last_point()->fno) <= INTFRAME) ++it;
-		else { // 移出候选体集合
+		(*it)->xy_expect(mjd, x, y);
+		if (frmnow_->InRect(x, y)) ++it;
+		else {
 			if ((*it)->complete()) candidate2object(*it); // 转换为目标
 			it = cans_.erase(it);
 		}
@@ -260,30 +266,11 @@ bool AFindPV::test_badcol(int col) {
 	return hit >= BADCNT;
 }
 
-//bool AFindPV::test_badpix(int col, int row) {
-//	int hit(1);
-//	UncBadpixVec::iterator it;
-//	for (it = uncbadpix_.begin(); !(it == uncbadpix_.end() || it->isPixel(row, col)); ++it);
-//	if (it != uncbadpix_.end()) {
-//		if ((hit = (*it).inc()) >= BADCNT) {
-//			uncbadpix_.erase(it);
-//			param_->AddBadpix(gid_, uid_, cid_, col, row);
-//		}
-//	}
-//	else {
-//		uncertain_badpix badpix(row, col);
-//		uncbadpix_.push_back(badpix);
-//	}
-//
-//	return hit >= BADCNT;
-//}
-
 void AFindPV::remove_badpix(FramePtr frame) {
 	string gid = frame->gid;
 	string uid = frame->uid;
 	string cid = frame->cid;
 	NFObjVec& objs = frame->nfobjs;
-//	int row;
 	int col;
 	CameraBadcol* badcol = param_->GetBadcol(gid, uid, cid);
 	if (badcol) {
@@ -295,17 +282,6 @@ void AFindPV::remove_badpix(FramePtr frame) {
 			else ++it;
 		}
 	}
-/*
-	CameraBadpix* badpix = param_->GetBadpix(gid, uid, cid);
-	if (badpix) {
-		for (NFObjVec::iterator it = objs.begin(); it != objs.end(); ) {
-			row = int((*it)->features[NDX_Y] + 0.5);
-			col = int((*it)->features[NDX_X] + 0.5);
-			if (badpix->test(col, row)) it = objs.erase(it);
-			else ++it;
-		}
-	}
-*/
 }
 
 void AFindPV::recheck_doubt() {
@@ -313,17 +289,12 @@ void AFindPV::recheck_doubt() {
 	std::vector<DoubtPixPtr>& pixels = doubtPixSet_.pixels;
 
 	for (std::vector<DoubtPixPtr>::iterator it = pixels.begin(); it != pixels.end(); ++it) {
-		n = (*it)->pathobj.size();
+		n = (*it)->pathtxt.size();
 		for (i = 0; i < n; ++i) {
 			if ((*it)->is_bad()) {
 				remove((*it)->pathtxt[i]);
 				remove((*it)->pathgtw[i]);
 			}
-			else if (dbt_.unique()) {
-				if (dbt_->UploadOrbit((*it)->pathobj[i].first, (*it)->pathobj[i].second))
-					_gLog->Write(LOG_FAULT, "AFindPV::upload_orbit()", "%s", dbt_->GetErrmsg());
-			}
-			remove((*it)->pathobj[i].first);
 		}
 		(*it)->reset();
 	}
@@ -371,7 +342,7 @@ void AFindPV::candidate2object(PvCanPtr can) {
 		DoubtPixPtr ptr;
 		if (doubtable) {
 			ptr = doubtPixSet_.get(col, row);
-			ptr->inc(pts[0]->mjd, pts[n-1]->mjd);
+			ptr->inc(pts[0]->fno, pts[n-1]->fno);
 		}
 		if (!(ptr.use_count() && ptr->is_bad())) {
 			for (PvPtVec::iterator it = pts.begin(); it != pts.end(); ++it) {
@@ -466,12 +437,9 @@ void AFindPV::upload_orbit(PvObjPtr obj, DoubtPixPtr ptr) {
 		}
 		fclose(fpobj);
 
-		if (ptr.use_count()) ptr->addpath_obj(objpath.string(), objname);
-		else {
-			if (dbt_->UploadOrbit(dirname_, objname))
-				_gLog->Write(LOG_FAULT, "AFindPV::upload_orbit()", "%s", dbt_->GetErrmsg());
-			remove(objpath);
-		}
+		if (dbt_->UploadOrbit(dirname_, objname))
+			_gLog->Write(LOG_FAULT, "AFindPV::upload_orbit()", "%s", dbt_->GetErrmsg());
+		remove(objpath);
 	}
 
 	// 生成完整轨迹文件

@@ -97,12 +97,14 @@ void MatchCatalog::match_ucac4(double r, bool fit) {
 	double emin, t1, t2, cosd;
 	FILE *fp = NULL;
 	double ermin(1E30), ermax(-1E30), edmin(1E30), edmax(-1E30);
+
+#ifdef NDEBUG
 	if (!fit) {
 		path filepath(frame_->filepath);
 		filepath.replace_extension(".txt");
 		fp = fopen(filepath.c_str(), "w");
 	}
-
+#endif
 	r /= 60.;	// 搜索半径, 量纲=>角分
 	for (NFObjVec::iterator x = nfobj.begin(); x != nfobj.end(); ++x) {
 		if (fit && (*x)->features[NDX_ELLIP] >= 0.3) continue;
@@ -110,13 +112,13 @@ void MatchCatalog::match_ucac4(double r, bool fit) {
 		ra = (*x)->ra_fit;
 		dc = (*x)->dec_fit;
 		cosd = cos(dc * D2R);
-
+#ifdef NDEBUG
 		if (fp) {
 			fprintf (fp, "%6.1f  %6.1f  %9.5f  %9.5f  ",
 					(*x)->features[NDX_X], (*x)->features[NDX_Y],
 					ra, dc);
 		}
-
+#endif
 		if ((nfound = ucac4_.FindStar(ra, dc, r))) {
 			starptr = ucac4_.GetResult();
 			if (nfound == 1) j = 0;
@@ -142,6 +144,7 @@ void MatchCatalog::match_ucac4(double r, bool fit) {
 			(*x)->matched  = 1;
 			++n;
 
+#ifdef NDEBUG
 			if (fp) {
 				er = ((*x)->ra_fit - (*x)->ra_cat) * 3600.0;
 				ed = ((*x)->dec_fit - (*x)->dec_cat) * 3600.0;
@@ -153,17 +156,22 @@ void MatchCatalog::match_ucac4(double r, bool fit) {
 						(*x)->ra_cat, (*x)->dec_cat,
 						er, ed);
 			}
+#endif
 		}
+#ifdef NDEBUG
 		if (fp) {
 			fprintf (fp, "\n");
 		}
+#endif
 	}
 	frame_->notOt = n;
+#ifdef NDEBUG
 	if (fp) {
 		fprintf (fp, "\n\n%5.1f  %5.1f  %5.1f  %5.1f\n",
 				ermin, ermax, edmin, edmax);
 		fclose(fp);
 	}
+#endif
 }
 
 void MatchCatalog::refstar_from_frame() {

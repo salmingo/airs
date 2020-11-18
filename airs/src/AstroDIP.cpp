@@ -90,12 +90,12 @@ void AstroDIP::load_catalog() {
 				filemntr_.c_str());
 	}
 	else {
-		if (x1 < 10) x1 = 10;
-		if (x2 > (frame_->wimg - 10)) x2 = frame_->wimg - 10;
-		if (y1 < 10) y1 = 10;
-		if (y2 > (frame_->himg)) y2 = frame_->himg - 10;
-		double xmin(10), xmax(frame_->wimg - 10);
-		double ymin(10), ymax(frame_->himg - 10);
+		if (x1 < 20) x1 = 20;
+		if (x2 > (frame_->wimg - 20)) x2 = frame_->wimg - 20;
+		if (y1 < 20) y1 = 20;
+		if (y2 > (frame_->himg)) y2 = frame_->himg - 20;
+		double xmin(20), xmax(frame_->wimg - 20);
+		double ymin(20), ymax(frame_->himg - 20);
 		double x, y;
 		/*
 		 * 行信息构成:
