@@ -5,6 +5,7 @@
  */
 
 #include <cstdio>
+#include <algorithm>
 #include <boost/make_shared.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/format.hpp>
@@ -288,10 +289,16 @@ void AFindPV::recheck_doubt() {
 	int i, n;
 	std::vector<DoubtPixPtr>& pixels = doubtPixSet_.pixels;
 
+	std::stable_sort(pixels.begin(), pixels.end(), [](const DoubtPixPtr& pix1, const DoubtPixPtr& pix2) {
+		return (pix1->col <= pix2->col);
+	});
+
 	for (std::vector<DoubtPixPtr>::iterator it = pixels.begin(); it != pixels.end(); ++it) {
-		n = (*it)->pathtxt.size();
-		for (i = 0; i < n; ++i) {
-			if ((*it)->is_bad()) {
+		_gLog->Write("DoubtPixel[%4d, %4d], count = %d", (*it)->col, (*it)->row, (*it)->count);
+		if ((*it)->is_bad()) {
+			n = (*it)->pathtxt.size();
+			for (i = 0; i < n; ++i) {
+				_gLog->Write("\tremove: %s", (*it)->pathtxt[i].c_str());
 				remove((*it)->pathtxt[i]);
 				remove((*it)->pathgtw[i]);
 			}

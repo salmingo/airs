@@ -119,7 +119,7 @@ void AstroDIP::load_catalog() {
 					&& y >= ymin && y <= ymax
 					&& features[NDX_FLUX] > 1.0
 					&& features[NDX_FWHM] > 0.5
-					&& features[NDX_BACK] < 22000.0) {
+					&& features[NDX_BACK] < 25000.0) {
 				nfobjs.push_back(body);
 				/*
 				 * 参与统计FWHM条件:

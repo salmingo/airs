@@ -5,8 +5,8 @@
  */
 
 #include <unistd.h>
-#include <longnam.h>
-#include <fitsio.h>
+#include <cfitsio/longnam.h>
+#include <cfitsio/fitsio.h>
 #include <string.h>
 #include <signal.h>
 #include <sys/wait.h>
@@ -125,6 +125,9 @@ void AstroMetry::thread_monitor() {
 		for (NFObjVec::iterator it = objs.begin(); it != objs.end(); ++it) {
 			wcs.image_to_wcs((*it)->features[NDX_X], (*it)->features[NDX_Y], (*it)->ra_fit, (*it)->dec_fit);
 		}
+	}
+	else {
+		_gLog->Write(LOG_WARN, NULL, "astrometry failed");
 	}
 #ifndef NDEBUG
 	for (int i = 0; i < PTMNTR_MAX; ++i) remove(ptMntr_[i]);

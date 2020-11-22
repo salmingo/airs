@@ -16,8 +16,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
-#include <longnam.h>
-#include <fitsio.h>
+#include <cfitsio/longnam.h>
+#include <cfitsio/fitsio.h>
 #include <string>
 #include "ADefine.h"
 #include "AMath.h"

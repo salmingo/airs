@@ -518,7 +518,7 @@ void DoProcess::on_receive_fileserver(const long, const long) {
 				frame->uid = fileinfo->uid;
 				frame->cid = fileinfo->cid;
 
-				// 通知可以接收数据
+				// 通知可以处理数据
 				mutex_lock lck(mtx_frm_reduct_);
 				queReduct_.push_back(frame);
 				cv_reduct_.notify_one();

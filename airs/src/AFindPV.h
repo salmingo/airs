@@ -231,7 +231,9 @@ public:
 			// 检测速度方向一致性
 			for (i = 2; i < n && valid; ++i) {
 				move_speed(pts[i - 1], pts[i], &rrate, &drate);
-				valid = sign_rate(rrate) == rsgn && sign_rate(drate) == dsgn;
+				if ((valid = sign_rate(rrate) == rsgn && sign_rate(drate) == dsgn)) {
+					valid = pts[i]->related <= 1;
+				}
 			}
 			if (!valid) {
 				for (i = 2; i < n; ++i) pts[i]->dec_rel();
@@ -324,7 +326,7 @@ public:
 		return count >= 3;
 	}
 
-	int inc(double fnob, double fnoe) {
+	int inc(int fnob, int fnoe) {
 		if (fnob < fno) ++count;
 		fno = fnoe;
 		return count;

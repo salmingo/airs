@@ -13,8 +13,8 @@
 #include <vector>
 #include <boost/smart_ptr.hpp>
 #include <string.h>
-#include <longnam.h>
-#include <fitsio.h>
+#include <cfitsio/longnam.h>
+#include <cfitsio/fitsio.h>
 #include "ADefine.h"
 
 using std::string;

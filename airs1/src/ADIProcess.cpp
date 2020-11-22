@@ -5,8 +5,8 @@
  */
 
 #include <thread>
-#include <longnam.h>
-#include <fitsio.h>
+#include <cfitsio/longnam.h>
+#include <cfitsio/fitsio.h>
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include "ADIProcess.h"
 
