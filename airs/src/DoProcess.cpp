@@ -260,9 +260,9 @@ bool DoProcess::check_image(FramePtr frame) {
 			frame->tmobs = datefull ? dateobs : tmfull;
 			ptime tmobs  = from_iso_extended_string(frame->tmobs);
 			// QHY CMOS 4040的两个时标(毫秒)
-			// 300: 曝光指令执行延迟
+			// 300: 曝光指令执行延迟 => 低轨数据偏差约25.5毫秒, 修正为274.5
 			// 125: 读出时间延迟
-			ptime tmmid  = tmobs + millisec(int(expdur * 500.0) + 300);
+			ptime tmmid  = tmobs + millisec(int(expdur * 500.0 + 274.5));
 			frame->tmmid = to_iso_extended_string(tmmid);
 			frame->secofday = tmmid.time_of_day().total_milliseconds() / 86400000.0;
 			frame->mjd      = tmmid.date().modjulian_day() + frame->secofday;

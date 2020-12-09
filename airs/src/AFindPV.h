@@ -55,7 +55,7 @@ typedef struct pv_point {// 单数据点
 public:
 	pv_point &operator=(const OneFrame &frame) {
 		filename = frame.filename;
-		tmmid    = frame.tmmid;
+//		tmmid    = frame.tmmid;
 		fno      = frame.fno;
 		mjd      = frame.mjd;
 
@@ -64,6 +64,7 @@ public:
 
 	pv_point &operator=(const ObjectInfo &obj) {
 		related = 0;
+		matched = obj.matched;
 		x      = obj.features[NDX_X];
 		y      = obj.features[NDX_Y];
 		ra     = obj.ra_fit;
@@ -116,7 +117,8 @@ typedef boost::shared_ptr<PvFrame> PvFrmPtr;
 typedef struct pv_candidate {///< 候选体
 	PvPtVec pts;	///< 已确定数据点集合
 	PvPtVec frmu;	///< 由当前帧加入的不确定数据点
-	double rs, ds;	///< RA/DEC变化速度
+	double spdr, spdd;	///< RA/DEC速度
+	double accr, accd;	///< RA/DEC加速度
 
 public:
 	int sign_rate(double rate) {
@@ -144,8 +146,11 @@ public:
 	void rd_expect(double mjd, double &ra, double &dec) {
 		PvPtPtr last = last_point();
 		double t = mjd - last->mjd;
-		ra  = fabs(rs) < ASPERDAY ? last->ra : cyclemod(last->ra + rs * t, 360.0);
-		dec = fabs(ds) < ASPERDAY ? last->dc : last->dc + ds * t;
+		double t1 = 0.5 * t * t;
+		ra  = fabs(spdr) < ASPERDAY ? last->ra
+				: cyclemod(last->ra + spdr * t + accr * t1, 360.0);
+		dec = fabs(spdd) < ASPERDAY ? last->dc
+				: last->dc + spdd * t + accd * t1;
 	}
 
 	bool is_expect(PvPtPtr pt) {
@@ -175,7 +180,8 @@ public:
 	void create(PvPtPtr pt1, PvPtPtr pt2) {
 		pts.push_back(pt1);
 		pts.push_back(pt2);
-		move_speed(pt1, pt2, &rs, &ds);
+		move_speed(pt1, pt2, &spdr, &spdd);
+		accr = accd = 0.0;
 	}
 
 	/*!
@@ -194,20 +200,25 @@ public:
 
 			rd_expect(frmu[0]->mjd, ra, dec);
 			for (int i = 0; i < n; ++i) {
-				if (!frmu[i]->matched) {
-					dr = fabs(frmu[i]->ra - ra);
-					dd = fabs(frmu[i]->dc - dec);
-					if (dr > 180.0) dr = 360.0 - dr;
-					dr2d2 = dr * dr + dd * dd;
-					if (dr2d2 < dr2d2min) {
-						dr2d2min = dr2d2;
-						pt = frmu[i];
-					}
+				dr = fabs(frmu[i]->ra - ra);
+				dd = fabs(frmu[i]->dc - dec);
+				if (dr > 180.0) dr = 360.0 - dr;
+				dr2d2 = dr * dr + dd * dd;
+				if (dr2d2 < dr2d2min) {
+					dr2d2min = dr2d2;
+					pt = frmu[i];
 				}
 			}
 		}
 		if (pt.use_count()) {
-			move_speed(last_point(), pt, &rs, &ds);
+			double t = pt->mjd - last_point()->mjd;
+			double sr_new, sd_new;
+			move_speed(last_point(), pt, &sr_new, &sd_new);
+			accr = (sr_new - spdr) / t;
+			accd = (sd_new - spdd) / t;
+			spdr = sr_new;
+			spdd = sd_new;
+
 			pt->inc_rel();
 			pts.push_back(pt);
 			frmu.clear();
@@ -216,30 +227,31 @@ public:
 
 	bool complete() {
 		int i, n(pts.size());
-		if (n < MINFRAME) return false;	// 有效数据长度>=5
+		bool valid(false);
+		if (n >= MINFRAME) {
+			double rrate, drate;
+			int rsgn, dsgn;
 
-		bool valid(true);
-		double rrate, drate;
-		int rsgn, dsgn;
+			move_speed(pts[0], last_point(), &rrate, &drate);
+			rsgn = sign_rate(rrate);
+			dsgn = sign_rate(drate);
+			valid = rsgn || dsgn;
 
-		move_speed(pts[0], last_point(), &rrate, &drate);
-		rsgn = sign_rate(rrate);
-		dsgn = sign_rate(drate);
-		valid = rsgn || dsgn;
-
-		if (valid) {// 规避: 恒星交叉判定失败. 2019-11-16一个数据避开该判定
-			// 检测速度方向一致性
-			for (i = 2; i < n && valid; ++i) {
-				move_speed(pts[i - 1], pts[i], &rrate, &drate);
-				if ((valid = sign_rate(rrate) == rsgn && sign_rate(drate) == dsgn)) {
-					valid = pts[i]->related <= 1;
+			if (valid) {// 规避: 恒星交叉判定失败. 2019-11-16一个数据避开该判定
+				// 检测速度方向一致性
+				for (i = 2; i < n && valid; ++i) {
+					move_speed(pts[i - 1], pts[i], &rrate, &drate);
+					valid =    sign_rate(rrate) == rsgn
+							&& sign_rate(drate) == dsgn
+							&& pts[i]->related == 1;
 				}
 			}
-			if (!valid) {
-				for (i = 2; i < n; ++i) pts[i]->dec_rel();
-				pts.clear();
-			}
 		}
+		if (!valid) {
+			for (i = 2; i < n; ++i) pts[i]->dec_rel();
+			pts.clear();
+		}
+
 		return valid;
 	}
 

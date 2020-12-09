@@ -4,15 +4,15 @@
 <GeoSite Name="HN">
     <Location Lon="111.714" Lat="16.450800000000001" Alt="10" Timezone="8"/>
 </GeoSite>
-<Output Path="/data"/>
+<Output Path="/Users/lxm/Data/output"/>
 <BadMark Path="/usr/local/etc/badmark_airs.xml"/>
-<Work Path="/dev/shm"/>
+<Work Path="/Users/lxm/Data/Temp"/>
 <SampleWindow Size="2048"/>
 <Reduction PathExe="/usr/local/bin/sex" PathConfig="/usr/local/etc/sex-param/default.sex"/>
-<Astrometry Enable="false" PathExe="/usr/local/bin/solve-field">
+<Astrometry Enable="true" PathExe="/usr/local/bin/solve-field">
     <PixelScale Low="8.3" High="8.5"/>
 </Astrometry>
-<Photometry Enable="false">
+<Photometry Enable="true">
     <Catalog Path="/Users/lxm/Catalogue/UCAC4"/>
 </Photometry>
 <Database Enable="false">
@@ -21,6 +21,6 @@
 <GeneralControl Enable="false">
     <Host IPv4="192.168.10.20" Port="4010"/>
 </GeneralControl>
-<FileServer Enable="true">
+<FileServer Enable="false">
     <Host IPv4="127.0.0.1" Port="4021"/>
 </FileServer>

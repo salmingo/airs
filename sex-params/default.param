@@ -1,9 +1,11 @@
-ISOAREA_IMAGE
-X_IMAGE_DBL
-Y_IMAGE_DBL
+X_IMAGE
+Y_IMAGE
 FLUX_AUTO
+MAG_AUTO
+MAGERR_AUTO
 FWHM_IMAGE
 ELLIPTICITY
+BACKGROUND
 #NUMBER                   Running object number                                    
 #EXT_NUMBER               FITS extension number                                    
 #FLUX_ISO                 Isophotal flux                                            [count]

@@ -224,7 +224,6 @@ void PhotoMetry::thread_match() {
 			}
 		}
 	}
-
 	working_ = false;
 	rsltPhotometry_(rslt);
 }

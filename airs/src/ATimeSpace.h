@@ -78,6 +78,7 @@ static double coef_aab[36][6] = {// 周年光行差改正系数
 struct AnnualAberration {
 protected:
 	double t;	//< 儒略世纪
+	double X, Y, Z;
 	double L2, L3, L4, L5, L6, L7, L8, LA, D, MA, F;
 	double sa[36], ca[36];	//< 参数的sin、cos项
 
@@ -91,6 +92,7 @@ protected:
 		t1 = (mjd - 51544.5) / 36525.0;
 		if (fabs(t - t1) < 1E-6) return;
 		t = t1;
+		X = Y = Z = 0.0;
 		L2 = 3.1761467 + 1021.3285546 * t;
 		L3 = 1.7534703 +  628.3075849 * t;
 		L4 = 6.2034809 +  334.0612431 * t;
@@ -155,6 +157,12 @@ protected:
 		coef_aab[4][1] =     -236 -   4 * t;
 		coef_aab[4][2] =     -216 -   4 * t;
 		coef_aab[4][3] =     -446 +   5 * t;
+
+		for (int i = 0; i < 36; ++i) {
+			X += (coef_aab[i][0] * sa[i] + coef_aab[i][1] * ca[i]);
+			Y += (coef_aab[i][2] * sa[i] + coef_aab[i][3] * ca[i]);
+			Z += (coef_aab[i][4] * sa[i] + coef_aab[i][5] * ca[i]);
+		}
 	}
 
 public:
@@ -170,16 +178,10 @@ public:
 	 */
 	void GetAnnualAberration(double mjd, double ra, double dec, double &d_ra, double &d_dec) {
 		double c(17314463350.0);
-		double X(0.0), Y(0.0), Z(0.0);
 		double cra  = cos(ra),  sra  = sin(ra);
 		double cdec = cos(dec), sdec = sin(dec);
 
 		set_mjd(mjd);
-		for (int i = 0; i < 36; ++i) {
-			X += (coef_aab[i][0] * sa[i] + coef_aab[i][1] * ca[i]);
-			Y += (coef_aab[i][2] * sa[i] + coef_aab[i][3] * ca[i]);
-			Z += (coef_aab[i][4] * sa[i] + coef_aab[i][5] * ca[i]);
-		}
 		d_ra  = cdec > 1E-4 ? (Y * cra - X * sra) / c / cdec : 0.0;
 		d_dec = (Z * cdec - (X * cra + Y * sra) * sdec) / c;
 	}

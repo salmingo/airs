@@ -236,7 +236,7 @@ void AFindPV::recheck_candidates() {
 		}
 	}
 #ifdef NDEBUG
-	printf("recheck_candidates(), candidates count = %d\n", cans_.size());
+	printf("recheck_candidates(), candidates count = %lu\n", cans_.size());
 #endif
 }
 
@@ -277,9 +277,7 @@ void AFindPV::remove_badpix(FramePtr frame) {
 	if (badcol) {
 		for (NFObjVec::iterator it = objs.begin(); it != objs.end(); ) {
 			col = int((*it)->features[NDX_X] + 0.5);
-			if (badcol->test(col)) {
-				it = objs.erase(it);
-			}
+			if (badcol->test(col)) it = objs.erase(it);
 			else ++it;
 		}
 	}
@@ -339,9 +337,8 @@ void AFindPV::candidate2object(PvCanPtr can) {
 		col = int((xmax + xmin) * 0.5 + 0.5);
 		row = int((ymin + ymax) * 0.5 + 0.5);
 		noise = test_badcol(col);	// 坏列
-		if (!noise && (ymax - ymin) <= 2.0 && ysig < 1.0) {// 热点?
+		if (!noise && (ymax - ymin) <= 2.0 && ysig < 1.0) {// 疑似坏点, 例如: 热点
 			doubtable = true;
-//			noise = true;
 		}
 	}
 	/*------------------------------------------------------------*/
@@ -645,10 +642,11 @@ void AFindPV::thread_newframe() {
 				create_dir(frame);
 			}
 			remove_badpix(frame);
-			upload_ot(frame);
 			new_frame(frame);
-			if (cross_match())
+			if (cross_match()) {
+				upload_ot(frame);
 				end_frame();
+			}
 		}
 	}
 }

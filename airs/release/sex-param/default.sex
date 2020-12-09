@@ -12,11 +12,10 @@ PARAMETERS_NAME  /usr/local/etc/sex-param/default.param  # name of the file cont
 #------------------------------- Extraction ----------------------------------
  
 DETECT_TYPE      CCD            # CCD (linear) or PHOTO (with gamma correction)
-DETECT_MINAREA   5              # min. # of pixels above threshold
-DETECT_MAXAREA   2000
+DETECT_MINAREA   3              # min. # of pixels above threshold
 
-DETECT_THRESH    3              # <sigmas> or <threshold>,<ZP> in mag.arcsec-2
-ANALYSIS_THRESH  10             # <sigmas> or <threshold>,<ZP> in mag.arcsec-2
+DETECT_THRESH    1.0            # <sigmas> or <threshold>,<ZP> in mag.arcsec-2
+ANALYSIS_THRESH  3.0            # <sigmas> or <threshold>,<ZP> in mag.arcsec-2
  
 FILTER           Y              # apply filter for detection (Y or N)?
 FILTER_NAME      /usr/local/etc/sex-param/default.conv   # name of the file containing the filter
@@ -31,7 +30,7 @@ CLEAN_PARAM      1.0            # Cleaning efficiency
 
 WEIGHT_TYPE      NONE           # type of WEIGHTing: NONE, BACKGROUND,
                                 # MAP_RMS, MAP_VAR or MAP_WEIGHT
-WEIGHT_IMAGE     weight.fits    # weight-map filename
+WEIGHT_IMAGE     weight.fit     # weight-map filename
 
 #-------------------------------- FLAGging -----------------------------------
 
@@ -41,7 +40,7 @@ FLAG_TYPE        OR             # flag pixel combination: OR, AND, MIN, MAX
 
 #------------------------------ Photometry -----------------------------------
  
-PHOT_APERTURES   5, 10          # MAG_APER aperture diameter(s) in pixels
+PHOT_APERTURES   5              # MAG_APER aperture diameter(s) in pixels
 PHOT_AUTOPARAMS  2.5, 5.0       # MAG_AUTO parameters: <Kron_fact>,<min_radius>
 PHOT_PETROPARAMS 2.0, 3.5       # MAG_PETRO parameters: <Petrosian_fact>,
                                 # <min_radius>
@@ -55,11 +54,11 @@ MAG_ZEROPOINT    25.0           # magnitude zero-point
 MAG_GAMMA        4.0            # gamma of emulsion (for photographic scans)
 GAIN             0.0            # detector gain in e-/ADU
 GAIN_KEY         GAIN           # keyword for detector gain in e-/ADU
-PIXEL_SCALE      1.0            # size of pixel in arcsec (0=use FITS WCS info)
+PIXEL_SCALE      8.4            # size of pixel in arcsec (0=use FITS WCS info)
  
 #------------------------- Star/Galaxy Separation ----------------------------
  
-SEEING_FWHM      3.0            # stellar FWHM in arcsec
+SEEING_FWHM      2.5            # stellar FWHM in arcsec
 STARNNW_NAME     /usr/local/etc/sex-param/default.nnw    # Neural-Network_Weight table filename
  
 #------------------------------ Background -----------------------------------
@@ -79,8 +78,8 @@ CHECKIMAGE_NAME  check.fits     # Filename for the check-image
  
 #--------------------- Memory (change with caution!) -------------------------
  
-MEMORY_OBJSTACK  5000           # number of objects in stack
-MEMORY_PIXSTACK  500000         # number of pixels in stack
+MEMORY_OBJSTACK  3000           # number of objects in stack
+MEMORY_PIXSTACK  300000         # number of pixels in stack
 MEMORY_BUFSIZE   1024           # number of lines in buffer
  
 #------------------------------- ASSOCiation ---------------------------------

@@ -58,24 +58,6 @@ void MatchCatalog::thread_process() {
 	 * astrometry.net生成WCS时的xy与SEx生成的xy存在偏差, 标准差与0.7pixel.
 	 * 使用2.5/0.7≈3.6x作为匹配阈值, 将尽可能多的参考星加入拟合
 	 */
-/*
-	match_ucac4(2.5 * frame_->scale);
-	// TNX拟合
-	refstar_from_frame();
-	if (!wcstnx_.ProcessFit()) {
-		rd_from_tnx();	// 由TNX模型计算xy对应的天球位置
-		match_ucac4(3. * model_.errfit); // 使用TNX拟合结果匹配星表, 匹配半径: 3x sigma
-		// TNX拟合
-		refstar_from_frame();
-		if (!wcstnx_.ProcessFit()) {
-			// 使用TNX拟合结果匹配星表, 匹配半径: 4x sigma
-			rd_from_tnx();
-			match_ucac4(4. * model_.errfit, false);
-			calc_center();
-			success = true;
-		}
-	}
-*/
 	match_ucac4(2.5 * frame_->scale);
 	refstar_from_frame();
 	if (!wcstnx_.ProcessFit()) {
@@ -95,10 +77,10 @@ void MatchCatalog::match_ucac4(double r, bool fit) {
 	int n(0), nfound, i, j;
 	double ra, dc, er, ed;
 	double emin, t1, t2, cosd;
-	FILE *fp = NULL;
-	double ermin(1E30), ermax(-1E30), edmin(1E30), edmax(-1E30);
 
 #ifdef NDEBUG
+	FILE *fp = NULL;
+	double ermin(1E30), ermax(-1E30), edmin(1E30), edmax(-1E30);
 	if (!fit) {
 		path filepath(frame_->filepath);
 		filepath.replace_extension(".txt");
@@ -107,7 +89,6 @@ void MatchCatalog::match_ucac4(double r, bool fit) {
 #endif
 	r /= 60.;	// 搜索半径, 量纲=>角分
 	for (NFObjVec::iterator x = nfobj.begin(); x != nfobj.end(); ++x) {
-		if (fit && (*x)->features[NDX_ELLIP] >= 0.3) continue;
 		(*x)->matched = 0;
 		ra = (*x)->ra_fit;
 		dc = (*x)->dec_fit;
@@ -164,6 +145,7 @@ void MatchCatalog::match_ucac4(double r, bool fit) {
 		}
 #endif
 	}
+//	_gLog->Write("notOT = %d of %lu", n, nfobj.size());
 	frame_->notOt = n;
 #ifdef NDEBUG
 	if (fp) {
