@@ -76,6 +76,7 @@ struct OneFrame {
 	string tmobs;		//< 曝光起始时间, UTC. CCYY-MM-DDThh:mm:ss.ssssss
 	string tmmid;		//< 曝光中间时间, UTC. CCYY-MM-DDThh:mm:ss.ssssss
 	string imgtype;		//< 图像类型
+	bool typeTrack;		//< 计划类型. true: Track; false: Point
 	int wimg;			//< 图像宽度
 	int himg;			//< 图像高度
 	int fno;			//< 帧编号
@@ -106,6 +107,7 @@ struct OneFrame {
 
 public:
 	OneFrame() {
+		typeTrack = false;
 		wimg = himg = 0;
 		fno  = 0;
 		secofday = 0;

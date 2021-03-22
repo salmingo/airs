@@ -55,8 +55,10 @@ bool AstroDIP::DoIt(FramePtr frame) {
 		return false;
 	}
 	execl(param_->pathExeSex.c_str(), "sex", frame_->filepath.c_str(),
-		"-c", param_->pathCfgSex.c_str(),
-		"-CATALOG_NAME", filemntr_.c_str(), NULL);
+//		"-c", param_->pathCfgSex.c_str(),
+		"-c", frame->typeTrack ? "/usr/local/etc/sex-param/low.sex" : "/usr/local/etc/sex-param/high.sex",
+		"-CATALOG_NAME", filemntr_.c_str(),
+		NULL);
 	exit(1);
 }
 

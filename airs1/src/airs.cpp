@@ -21,11 +21,13 @@
 #include <string.h>
 #include <regex>
 #include <vector>
+#include <boost/filesystem.hpp>
 #include "globaldef.h"
 #include "Parameter.h"
 #include "ADIProcess.h"
 #include "AMath.h"
 
+using namespace boost::filesystem;
 using namespace AstroUtil;
 typedef std::vector<string> strvector;
 
@@ -40,6 +42,38 @@ void Usage() {
 	printf(" -h / --help    : print this help message\n");
 	printf(" -d / --default : generate default configuration file here\n");
 	printf(" -c / --config  : specify configuration file\n");
+}
+
+void process_sequence(strvector& files, Parameter* param) {
+	ADIProcess adip(param);
+	int n = files.size();
+	for (int i = 0; i < n; ++i) {
+		adip.SetImage(files[i]);
+		if (adip.DoIt()) {
+			// 剔除恒星
+
+			// 关联识别运动目标
+		}
+	}
+	// 输出运动目标关联识别结果
+}
+
+void process_directory(const string& dirname, Parameter* param) {
+	ADIProcess adip(param);
+	strvector files;
+
+	for (directory_iterator x = directory_iterator(dirname); x != directory_iterator(); ++x) {
+		if (is_directory(x->path().string())) process_directory(x->path().string(), param);
+		else if (x->path().extension().string().rfind(".fit") != string::npos) {
+			files.push_back(x->path().string());
+		}
+	}
+	if (files.size() >= 5) {
+		sort(files.begin(), files.end(), [](const string &name1, const string &name2) {
+			return name1 < name2;
+		});
+	}
+	process_sequence(files, param);
 }
 
 int main(int argc, char **argv) {
@@ -98,14 +132,21 @@ int main(int argc, char **argv) {
 		printf("failed to access configuration file\n");
 		return -4;
 	}
-	/* 启动数据处理流程 */
-	ADIProcess adip(&param);
-	for (int i = 0; i < argc; ++i) {
-		adip.SetImage(argv[i]);
-		if (adip.DoIt()) {
 
-		}
+	/* 启动数据处理流程 */
+	strvector files;
+	for (int i = 0; i < argc; ++i) {
+		path pathname(argv[i]);
+		if (is_directory(pathname)) process_directory(pathname.string(), &param);
+		else if (is_regular_file(pathname) && pathname.extension().string().rfind(".fit") != string::npos)
+			files.push_back(argv[i]);
 	}
+	if (files.size() >= 5) {
+		sort(files.begin(), files.end(), [](const string &name1, const string &name2) {
+			return name1 < name2;
+		});
+	}
+	process_sequence(files, &param);
 
 	return 0;
 }

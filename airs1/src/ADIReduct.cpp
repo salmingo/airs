@@ -56,10 +56,10 @@ bool ADIReduct::DoIt(ImgFrmPtr frame) {
 	init_glob();
 	if (lastid_) group_glob();
 	// 评估星像质量
-	stat_quality();
+//	stat_quality();
 	// 目标提取与计算
 
-	printf ("ellapsed: %.3f sec\n", (microsec_clock::local_time() - now).total_microseconds() * 1E-6);
+//	printf ("ellapsed: %.3f sec\n", (microsec_clock::local_time() - now).total_microseconds() * 1E-6);
 	return false;
 }
 
@@ -828,7 +828,12 @@ void ADIReduct::group_glob() {
 		if (!can->flag && can->npix) frame_->nfobj[j++] = *can;
 	}
 
-	// 7: 释放临时资源
+	// 7: 安装信噪比降序排序
+	sort(frame_->nfobj.begin(), frame_->nfobj.end(), [](const ObjectInfo &obj1, const ObjectInfo &obj2) {
+		return obj1.snr > obj2.snr;
+	});
+
+	// 8: 释放临时资源
 	cans.clear();
 
 #ifdef NDEBUG
@@ -836,7 +841,7 @@ void ADIReduct::group_glob() {
 	FILE *fp = fopen("cans.txt", "w");
 	double dx, dy;
 
-	fprintf (fp, "%7s %7s %6s %6s | %5s %5s | %5s %5s %2s %5s %5s | %4s | %5s | %7s\n",
+	fprintf (fp, "%7s %7s %6s %6s | %5s %5s | %5s %5s %2s %5s %5s | %5s | %6s | %7s\n",
 			"X.Cent", "Y.Cent", "X.Peak", "Y.Peak", "X.C-P", "Y.C-P",
 			"X.Min", "Y.Min"," ", "X.Max", "Y.Max",
 			"NPix",
@@ -846,7 +851,7 @@ void ADIReduct::group_glob() {
 		dx = can->ptbc.x - can->ptpeak.x;
 		dy = can->ptbc.y - can->ptpeak.y;
 
-		fprintf (fp, "%7.2f %7.2f %6.0f %6.0f | %5.1f %5.1f | [%4d %4d] => [%4d %4d] | %4d | %5.1f | %7.0f",
+		fprintf (fp, "%7.2f %7.2f %6.0f %6.0f | %5.1f %5.1f | [%4d %4d] => [%4d %4d] | %5d | %6.1f | %7.0f",
 				can->ptbc.x, can->ptbc.y,
 				can->ptpeak.x, can->ptpeak.y,
 				dx, dy,

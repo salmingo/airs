@@ -211,7 +211,7 @@ bool DoProcess::check_image(FramePtr frame) {
 		// 读取文件头信息
 		fitsfile *fitsptr;	//< 基于cfitsio接口的文件操作接口
 		int status(0);
-		char dateobs[30], timeobs[30], temp[30];
+		char dateobs[30], timeobs[30], temp[30], objname[30], plan_type[30];
 		bool datefull;
 		double expdur;
 
@@ -236,6 +236,15 @@ bool DoProcess::check_image(FramePtr frame) {
 			status = 0;
 		}
 		frame->expdur = expdur;
+		fits_read_key(fitsptr, TSTRING, "PLANTYPE", plan_type, NULL, &status);
+		if (!status) {
+			frame->typeTrack = strcasecmp(plan_type, "TRACK") == 0;
+		}
+		else {
+			status = 0;
+			fits_read_key(fitsptr, TSTRING, "OBJECT", objname, NULL, &status);
+			frame->typeTrack = strcasecmp(objname, "point") != 0;
+		}
 		if (!status) {// 不存在关键字的特殊处理
 			fits_read_key(fitsptr, TSTRING, "GROUP_ID", temp, NULL, &status);
 			frame->gid = temp;
@@ -260,9 +269,9 @@ bool DoProcess::check_image(FramePtr frame) {
 			frame->tmobs = datefull ? dateobs : tmfull;
 			ptime tmobs  = from_iso_extended_string(frame->tmobs);
 			// QHY CMOS 4040的两个时标(毫秒)
-			// 300: 曝光指令执行延迟 => 低轨数据偏差约25.5毫秒, 修正为274.5
-			// 125: 读出时间延迟
-			ptime tmmid  = tmobs + millisec(int(expdur * 500.0 + 274.5));
+			// 300: 曝光指令执行延迟 => 低轨数据偏差约45毫秒, 修正为340
+			// 120: 读出时间延迟
+			ptime tmmid  = tmobs + millisec(int(expdur * 500.0 + 340));
 			frame->tmmid = to_iso_extended_string(tmmid);
 			frame->secofday = tmmid.time_of_day().total_milliseconds() / 86400000.0;
 			frame->mjd      = tmmid.date().modjulian_day() + frame->secofday;

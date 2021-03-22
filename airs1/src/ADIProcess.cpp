@@ -63,6 +63,10 @@ bool ADIProcess::SetImage(const string &filepath) {
 
 bool ADIProcess::ADIProcess::DoIt() {
 	if (!reduct_->DoIt(frmptr_)) return false;
+	// 粗天文定位
+
+	// 高精度天文定位
+
 	// 输出ADIReduct处理结果
 	return true;
 }

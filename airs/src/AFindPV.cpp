@@ -85,7 +85,7 @@ void AFindPV::new_frame(FramePtr frame) {
 
 	ptime frmmid = from_iso_extended_string(frame->tmmid);
 	ptime objmid;
-	double tread(125.0);
+	double tread(120.0);
 	double lines(4096.0);
 	double tline = tread / lines;
 
@@ -230,6 +230,7 @@ void AFindPV::recheck_candidates() {
 	for (PvCanVec::iterator it = cans_.begin(); it != cans_.end();) {
 		(*it)->xy_expect(mjd, x, y);
 		if (frmnow_->InRect(x, y)) ++it;
+//		if (((*it)->last_point()->fno - last_fno_) < 5) ++it;
 		else {
 			if ((*it)->complete()) candidate2object(*it); // 转换为目标
 			it = cans_.erase(it);
