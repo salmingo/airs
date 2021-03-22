@@ -22,6 +22,8 @@ protected:
 	Parameter *param_;	//< 参数
 	ImgFrmPtr frmptr_;	//< 存储区: 图像处理结果
 
+	double ra0, dec0;	//< 视场中心预测位置, J2000, 角度
+
 	/* 数据处理接口 */
 	ADIReductPtr reduct_;	//< 图像处理接口
 

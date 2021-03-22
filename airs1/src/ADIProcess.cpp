@@ -16,6 +16,7 @@ namespace AstroUtil {
 //////////////////////////////////////////////////////////////////////////////
 ADIProcess::ADIProcess(Parameter *param) {
 	param_ = param;
+	ra0 = dec0 = 1E30; // 预测: 未知视场中心
 	reduct_ = make_reduct(param);
 }
 
@@ -68,6 +69,7 @@ bool ADIProcess::ADIProcess::DoIt() {
 	// 高精度天文定位
 
 	// 输出ADIReduct处理结果
+
 	return true;
 }
 
