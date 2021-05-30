@@ -1,43 +1,39 @@
 #                                               -*- Autoconf -*-
 # Process this file with autoconf to produce a configure script.
 
-AC_PREREQ([2.69])
+AC_PREREQ([2.71])
 AC_INIT([FULL-PACKAGE-NAME], [VERSION], [BUG-REPORT-ADDRESS])
 AC_CONFIG_SRCDIR([src/AMath.h])
 AC_CONFIG_HEADERS([config.h])
 
 # Checks for programs.
 AC_PROG_CXX
-AC_PROG_AWK
 AC_PROG_CC
-AC_PROG_INSTALL
-AC_PROG_CPP
-AC_PROG_MKDIR_P
 
 # Checks for libraries.
-# FIXME: Replace `main' with a function in `-lboost_chrono':
+# FIXME: Replace 'main' with a function in '-lboost_chrono':
 AC_CHECK_LIB([boost_chrono], [main])
-# FIXME: Replace `main' with a function in `-lboost_date_time':
+# FIXME: Replace 'main' with a function in '-lboost_date_time':
 AC_CHECK_LIB([boost_date_time], [main])
-# FIXME: Replace `main' with a function in `-lboost_filesystem':
+# FIXME: Replace 'main' with a function in '-lboost_filesystem':
 AC_CHECK_LIB([boost_filesystem], [main])
-# FIXME: Replace `main' with a function in `-lboost_system':
+# FIXME: Replace 'main' with a function in '-lboost_system':
 AC_CHECK_LIB([boost_system], [main])
-# FIXME: Replace `main' with a function in `-lboost_thread':
+# FIXME: Replace 'main' with a function in '-lboost_thread':
 AC_CHECK_LIB([boost_thread], [main])
-# FIXME: Replace `main' with a function in `-lcfitsio':
+# FIXME: Replace 'main' with a function in '-lcfitsio':
 AC_CHECK_LIB([cfitsio], [main])
-# FIXME: Replace `main' with a function in `-lcurl':
+# FIXME: Replace 'main' with a function in '-lcurl':
 AC_CHECK_LIB([curl], [main])
-# FIXME: Replace `main' with a function in `-lm':
+# FIXME: Replace 'main' with a function in '-lm':
 AC_CHECK_LIB([m], [main])
-# FIXME: Replace `main' with a function in `-lpthread':
+# FIXME: Replace 'main' with a function in '-lpthread':
 AC_CHECK_LIB([pthread], [main])
-# FIXME: Replace `main' with a function in `-lrt':
+# FIXME: Replace 'main' with a function in '-lrt':
 AC_CHECK_LIB([rt], [main])
 
 # Checks for header files.
-AC_CHECK_HEADERS([fcntl.h stdlib.h string.h syslog.h unistd.h])
+AC_CHECK_HEADERS([fcntl.h syslog.h unistd.h])
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_CHECK_HEADER_STDBOOL
@@ -52,7 +48,5 @@ AC_FUNC_FORK
 AC_CHECK_FUNCS([bzero ftruncate memset mkdir pow sqrt strcasecmp strpbrk strstr])
 
 AC_CONFIG_FILES([Makefile
-                 release/Makefile
-                 release/src/Makefile
                  src/Makefile])
 AC_OUTPUT

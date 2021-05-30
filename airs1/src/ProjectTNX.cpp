@@ -17,7 +17,8 @@ void power_array(double value, double min, double max, int order, double *ptr) {
 }
 
 void legendre_array(double value, double min, double max, int order, double *ptr) {
-	double norm = ((max + min) - 2 * value) / (max - min);
+//	double norm = ((max + min) - 2 * value) / (max - min);
+	double norm = (2 * value - min - max) / (max - min);
 
 	ptr[0] = 1.0;
 	if (order > 1) ptr[1] = norm;
@@ -27,7 +28,8 @@ void legendre_array(double value, double min, double max, int order, double *ptr
 }
 
 void chebyshev_array(double value, double min, double max, int order, double *ptr) {
-	double norm = ((max + min) - 2 * value) / (max - min);
+//	double norm = ((max + min) - 2 * value) / (max - min);
+	double norm = (2 * value - min - max) / (max - min);
 
 	ptr[0] = 1.0;
 	if (order > 1) ptr[1] = norm;

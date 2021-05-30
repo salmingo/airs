@@ -23,6 +23,8 @@ Parameter::Parameter() {
 	area0 = area1 = 0;
 	ufo   = false;
 	ucs   = false;
+	scale_low = 1.0;
+	scale_high = 10.0;
 }
 
 Parameter::~Parameter() {
@@ -63,6 +65,11 @@ void Parameter::Init(const string &filepath) {
 	pt2.add("<xmlcomment>", "use filter to detect signal");
 	pt2.add("CleanSpurious.<xmlattr>.Enable",  true);
 
+	ptree &pt3 = nodes.add("Astrometry", "");
+	pt3.add("Catalogue.<xmlattr>.Path", "/Users/lxm/Catalogue/tycho2/tycho2.dat");
+	pt3.add("ScaleGuess.<xmlattr>.Low",  1.0);
+	pt3.add("ScaleGuess.<xmlattr>.High", 10.0);
+
 	modified = true;
 }
 
@@ -94,6 +101,11 @@ bool Parameter::Load(const string &filepath) {
 				ufo    = child.second.get("Filter.<xmlattr>.Enable",         false);
 				pathfo = child.second.get("Filter.<xmlattr>.Filepath",          "");
 				ucs    = child.second.get("CleanSpurious.<xmlattr>.Enable",  false);
+			}
+			else if (iequals(child.first, "Astrometry")) {
+				pathcat    = child.second.get("Catalogue.<xmlattr>.Path", "");
+				scale_low  = child.second.get("ScaleGuess.<xmlattr>.Low", 1.0);
+				scale_high = child.second.get("ScaleGuess.<xmlattr>.Low", 1.0);
 			}
 			else if (iequals(child.first, "Output")) {
 				patho = child.second.get("<xmlattr>.Path", "");

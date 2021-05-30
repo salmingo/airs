@@ -18,6 +18,8 @@ ADIProcess::ADIProcess(Parameter *param) {
 	param_ = param;
 	ra0 = dec0 = 1E30; // 预测: 未知视场中心
 	reduct_ = make_reduct(param);
+	astro_general_.reset(new AAstrometryGeneral);
+	astro_precise_.reset(new AAstrometryPrecise);
 }
 
 ADIProcess::~ADIProcess() {
@@ -64,16 +66,35 @@ bool ADIProcess::SetImage(const string &filepath) {
 
 bool ADIProcess::ADIProcess::DoIt() {
 	if (!reduct_->DoIt(frmptr_)) return false;
-	// 粗天文定位
+	// 粗天文定位: 选前N个亮星, 粗定位
 
-	// 高精度天文定位
+	// 高精度天文定位: 选视场内所有星, 精定位
 
+#ifdef NDEBUG
 	// 输出ADIReduct处理结果
+	FILE *fp = fopen("objects.txt", "w");
+	NFObjVector& objs = frmptr_->nfobj;
+	int n = frmptr_->nobjs;
+
+	fprintf (fp, "%7s %7s | %9s %9s | %9s %9s\n",
+			"X", "Y",
+			"RA-Inst", "DEC-Inst",
+			"RA-Cat", "DEC-Cat");
+	for (int i = 0; i <n; ++i) {
+		fprintf (fp, "%7.2f %7.2f | %9.5f %9.5f | %9.5f %9.5f\n",
+				objs[i].ptbc.x, objs[i].ptbc.y,
+				objs[i].ra_inst, objs[i].dec_inst,
+				objs[i].ra_cat, objs[i].dec_cat);
+	}
+	fclose(fp);
+#endif
 
 	return true;
 }
 
 //////////////////////////////////////////////////////////////////////////////
-
+bool ADIProcess::isvalid_center() {
+	return (ra0 >= 0.0 && ra0 < 360.0 && dec0 >= -90.0 && dec0 <= 90.0);
+}
 //////////////////////////////////////////////////////////////////////////////
 }

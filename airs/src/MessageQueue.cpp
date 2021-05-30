@@ -46,6 +46,7 @@ bool MessageQueue::Start(const char* name) {
 	if (thrdmsg_.unique()) return true;
 
 	try {
+		name_ = name;
 		message_queue::remove(name);
 		mq_.reset(new message_queue(boost::interprocess::create_only, name, 1024, sizeof(MSG_UNIT)));
 		thrdmsg_.reset(new boost::thread(boost::bind(&MessageQueue::thread_message, this)));
@@ -66,6 +67,7 @@ void MessageQueue::Stop() {
 		thrdmsg_.reset();
 	}
 	if (mq_.unique()) mq_.reset();
+	message_queue::remove(name_.c_str());
 }
 
 void MessageQueue::interrupt_thread(threadptr& thrd) {

@@ -40,6 +40,9 @@ public:
 	bool ucs;			//< 启用: 剔除假信号
 
 	/* 天文定位 */
+	string pathcat;		//< Tycho2压缩星表路径, 2021-03
+	double scale_low;	//< 像元比例尺下限, 角秒/像元
+	double scale_high;	//< 像元比例尺上限, 角秒/像元
 
 	/* 流量定标 */
 

@@ -12,6 +12,7 @@
 #include <boost/smart_ptr.hpp>
 #include <boost/thread.hpp>
 #include <boost/interprocess/ipc/message_queue.hpp>
+#include <string>
 
 class MessageQueue {
 public:
@@ -61,6 +62,7 @@ protected:
 
 protected:
 	// 成员变量
+	std::string name_;		//< 消息队列名称
 	msgqptr mq_;			//< 消息队列
 	cbfarray funcs_;		//< 回调函数
 	threadptr thrdmsg_;		//< 消息响应线程

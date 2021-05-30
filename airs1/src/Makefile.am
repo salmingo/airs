@@ -1,5 +1,6 @@
 bin_PROGRAMS=airs1
 airs1_SOURCES=Parameter.cpp AMath.cpp ADIReduct.cpp ADIProcess.cpp ACatalog.cpp ACatTycho2.cpp \
+              AAstrometryGeneral.cpp AAstrometryPrecise.cpp AMatchStar.cpp \
               ProjectTNX.hpp AFindPV.cpp airs.cpp
 
 if DEBUG

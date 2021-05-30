@@ -10,6 +10,8 @@
 #include "Parameter.h"
 #include "ADIData.h"
 #include "ADIReduct.h"
+#include "AAstrometryGeneral.h"
+#include "AAstrometryPrecise.h"
 
 namespace AstroUtil {
 //////////////////////////////////////////////////////////////////////////////
@@ -26,6 +28,8 @@ protected:
 
 	/* 数据处理接口 */
 	ADIReductPtr reduct_;	//< 图像处理接口
+	AAstroGPtr astro_general_;	//< 天文定位: 粗略
+	AAstroPPtr astro_precise_;	//< 天文定位: 精确
 
 public:
 	/*!
@@ -39,8 +43,16 @@ public:
 	 * @brief 处理已缓存文件
 	 */
 	bool DoIt();
+	/*!
+	 * @brief 获取当前图像访问指针
+	 */
+	ImgFrmPtr GetFrame();
 
 protected:
+	/*!
+	 * @brief 检测视场中心坐标有效性
+	 */
+	bool isvalid_center();
 };
 //////////////////////////////////////////////////////////////////////////////
 }

@@ -38,8 +38,8 @@ bool DoProcess::StartService(bool asdaemon, boost::asio::io_service *ios) {
 	create_objects();
 	if (asdaemon) {/* 为成员变量分配资源 */
 		register_messages();
-		std::string name = "msgque_";
-		name += DAEMON_NAME;
+		std::string name = DAEMON_NAME;
+		name += to_iso_string(second_clock::universal_time());
 		if (!Start(name.c_str())) return false;
 		if (!connect_server_gc()) return false;
 		if (!connect_server_fileserver()) return false;

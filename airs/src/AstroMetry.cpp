@@ -5,8 +5,8 @@
  */
 
 #include <unistd.h>
-#include <cfitsio/longnam.h>
-#include <cfitsio/fitsio.h>
+#include <longnam.h>
+#include <fitsio.h>
 #include <string.h>
 #include <signal.h>
 #include <sys/wait.h>
@@ -114,6 +114,7 @@ void AstroMetry::thread_monitor() {
 	wcsinfo wcs;
 
 	while (pid_ != (pid = waitpid(pid_, &status, WNOHANG | WUNTRACED)) && pid != -1);
+	boost::this_thread::sleep_for(boost::chrono::seconds(1));
 	if (pid_ == pid) success = wcs.load_wcs(ptMntr_[PTMNTR_WCS]);
 	if (success) {
 		/* 计算像元比例尺 */

@@ -18,7 +18,6 @@ DETECT_THRESH    1.0            # <sigmas> or <threshold>,<ZP> in mag.arcsec-2
 ANALYSIS_THRESH  3.0           # <sigmas> or <threshold>,<ZP> in mag.arcsec-2
  
 FILTER           Y              # apply filter for detection (Y or N)?
-# FILTER_NAME      /usr/local/etc/sex-param/gauss_5.0_9x9.conv   # name of the file containing the filter
 FILTER_NAME      /usr/local/etc/sex-param/low.conv   # name of the file containing the filter
 
 DEBLEND_NTHRESH  32             # Number of deblending sub-thresholds

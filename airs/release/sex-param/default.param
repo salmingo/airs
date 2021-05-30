@@ -6,6 +6,7 @@ MAGERR_AUTO
 FWHM_IMAGE
 ELLIPTICITY
 BACKGROUND
+FLUXERR_AUTO
 #NUMBER                   Running object number                                    
 #EXT_NUMBER               FITS extension number                                    
 #FLUX_ISO                 Isophotal flux                                            [count]
